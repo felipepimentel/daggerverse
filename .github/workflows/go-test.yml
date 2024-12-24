@@ -1,0 +1,59 @@
+---
+name: go-test
+
+run-name: Go-Test
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "**/*_test.go"
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  skip_duplicate_actions:
+    name: Skip Duplicate Actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fkirc/skip-duplicate-actions@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          cancel_others: true
+          concurrent_skipping: never
+
+  go_test:
+    name: Go Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - actionlint
+          - editorconfig
+          - hadolint
+          - hello
+          - quarto
+          - revive
+          - ruff
+          - shellcheck
+          - yamllint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go latest
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Test
+        run: |
+          go test -v main_test.go
+        working-directory: ${{ matrix.module }}

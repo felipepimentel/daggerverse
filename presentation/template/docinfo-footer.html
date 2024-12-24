@@ -1,0 +1,23 @@
+<!-- FIXME: move logos to docinfo-header.html once
+	https://github.com/asciidoctor/asciidoctor-reveal.js/pull/510
+	has been merged -->
+<div id="logo-title"></div>
+<div id="logo-header-left"></div>
+<div id="logo-header-right"></div>
+<script type="module">
+	import Notes from '@camptocamp/reveal.js/plugin/notes/notes.esm.js'
+	import Search from '@camptocamp/reveal.js/plugin/search/search.esm.js'
+	import Zoom from '@camptocamp/reveal.js/plugin/zoom/zoom.esm.js'
+
+	Reveal.registerPlugin(Notes)
+	Reveal.registerPlugin(Search)
+	Reveal.registerPlugin(Zoom)
+
+	Reveal.on('overviewshown', () => {
+		document.body.classList.add('overview');
+	});
+
+	Reveal.on('overviewhidden', () => {
+		document.body.classList.remove('overview');
+	});
+</script>

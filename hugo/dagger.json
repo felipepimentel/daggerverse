@@ -1,0 +1,16 @@
+{
+  "name": "hugo",
+  "engineVersion": "v0.15.1",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "golang",
+      "source": "../golang"
+    },
+    {
+      "name": "redhat",
+      "source": "../redhat"
+    }
+  ],
+  "source": "."
+}

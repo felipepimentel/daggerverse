@@ -1,0 +1,17 @@
+---
+asciidocExt:
+  extensions:
+    - "asciidoctor-kroki"
+
+  attributes:
+    kroki-server-url: "http://kroki:8000"
+    kroki-fetch-diagram: true
+
+    toc: true
+    sectanchors: true
+    icons: "font"
+
+    # Enable keyboard macro
+    experimental: true
+
+  workingFolderCurrent: true

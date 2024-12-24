@@ -1,0 +1,6 @@
+github.com/FortAwesome/Font-Awesome v0.0.0-20240716171331-37eff7fa00de h1:JvHOfdSqvArF+7cffH9oWU8oLhn6YFYI60Pms8M/6tI=
+github.com/FortAwesome/Font-Awesome v0.0.0-20240716171331-37eff7fa00de/go.mod h1:IUgezN/MFpCDIlFezw3L8j83oeiIuYoj28Miwr/KUYo=
+github.com/camptocamp/docsy v0.0.0-20241213092258-458dbd0ff771 h1:ANZbGxOftKHLCU//pL7i4FbpRfr9Q/l5pxAwvjkntmI=
+github.com/camptocamp/docsy v0.0.0-20241213092258-458dbd0ff771/go.mod h1:vnFvHZr2T9S45R7IokTUPfa8v+k9lYDq1omtoZGYPDQ=
+github.com/twbs/bootstrap v5.3.3+incompatible h1:goFoqinzdHfkeegpFP7pvhbd0g+A3O2hbU3XCjuNrEQ=
+github.com/twbs/bootstrap v5.3.3+incompatible/go.mod h1:fZTSrkpSf0/HkL0IIJzvVspTt1r9zuf7XlZau8kpcY0=

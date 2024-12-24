@@ -1,0 +1,45 @@
+---
+name: go
+
+run-name: Go
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "**/*.go"
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  skip_duplicate_actions:
+    name: Skip Duplicate Actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fkirc/skip-duplicate-actions@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          cancel_others: true
+          concurrent_skipping: never
+
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go latest
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Revive
+        run: |
+          go install github.com/mgechev/revive@latest
+          find . -type f -name '*.go' -not -path '*/internal/*' -not -path '*/testdata/*' -print0 | xargs -0 revive -config .revive.toml

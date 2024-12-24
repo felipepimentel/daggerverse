@@ -1,0 +1,32 @@
+{
+  "name": "documentation",
+  "engineVersion": "v0.15.1",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "caddy",
+      "source": "../caddy"
+    },
+    {
+      "name": "golang",
+      "source": "../golang"
+    },
+    {
+      "name": "hugo",
+      "source": "../hugo"
+    },
+    {
+      "name": "kroki",
+      "source": "../kroki"
+    },
+    {
+      "name": "nodejs",
+      "source": "../nodejs"
+    },
+    {
+      "name": "redhat",
+      "source": "../redhat"
+    }
+  ],
+  "source": "."
+}

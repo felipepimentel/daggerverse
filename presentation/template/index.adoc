@@ -1,0 +1,143 @@
+= Presentation template: An example of what is possible
+John Doe
+include::_attributes.adoc[]
+
+Abstract
+
+{docdate}
+
+== Table of content
+
+* First item
+* Second item
+* Third item
+
+== Horizontal slide 1
+
+=== Vertical slide 1
+
+Content of first slide
+
+=== !
+
+Content continuation of first slide
+
+=== Vertical slide 2
+
+Content of second slide
+
+== Horizontal slide 2
+
+[.columns]
+=== Columns
+
+[.column]
+--
+Column 1
+
+Content of first column.
+--
+
+[.column]
+--
+Column 2
+
+Content of second column.
+--
+
+=== Steps
+
+[%step]
+. One
+. Two
+. Three
+
+== Unordered list
+
+* One
+** A
+** B
+* Two
+* Three
+
+=== Ordered list
+
+. One
+.. A
+.. B
+. Two
+. Three
+
+=== Tables
+
+.Title
+[%header, cols="2,3"]
+|===
+|Header C1, R1
+|Header C2, R1
+
+|Cell C1, R2
+|Cell C2, R2
+
+|Cell C1, R3
+|Cell C2, R3
+|===
+
+=== Source code
+
+[source, golang, highlight="1|3..5|7..9"]
+--
+package main <1>
+
+import (
+	"fmt" <2>
+)
+
+func main() { <3>
+    fmt.Println("Hello, World!")
+}
+--
+<1> Package declaration
+<2> `fmt` package import
+<3> Program entrypoint
+
+=== Admonitions
+
+NOTE: this is a note.
+
+TIP: this is a tip.
+
+IMPORTANT: this is important.
+
+CAUTION: be careful.
+
+WARNING: danger zone!
+
+=== Speaker Notes
+
+You can add speaker notes and see them during the presentation by pressing s.
+
+[.notes]
+****
+* this is the new block type for speaker notes
+* only visible in the speaker window
+****
+
+=== Glossary
+
+Term 1::
+Definition 1.
+
+Term 2::
+Definition 2.
+
+Term 3::
+Definition 3.
+
+=== Image
+
+image::logo.svg[]
+
+=== Diagram
+
+nomnoml::diagrams/test.uml[]

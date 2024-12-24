@@ -1,0 +1,6 @@
+#!/bin/sh
+
+name="$(basename "$0")"
+prefix="$(realpath "$(dirname "$0")/../libexec/$name")"
+
+exec "$prefix/dart" "$prefix/$name.snapshot" "$@"

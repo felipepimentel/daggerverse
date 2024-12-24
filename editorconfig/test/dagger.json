@@ -1,0 +1,12 @@
+{
+  "name": "editorconfig/test",
+  "engineVersion": "v0.15.1",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "editorconfig",
+      "source": ".."
+    }
+  ],
+  "source": "."
+}

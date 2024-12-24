@@ -1,0 +1,6 @@
+{
+  "name": "postgres",
+  "sdk": "go",
+  "source": ".",
+  "engineVersion": "v0.10.2"
+}
