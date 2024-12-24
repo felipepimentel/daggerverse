@@ -1,0 +1,19 @@
+{
+  "name": "python-poetry",
+  "sdk": "go",
+  "engineVersion": "v0.15.1",
+  "source": ".",
+  "dependencies": [
+    {
+      "name": "dagger",
+      "source": "github.com/dagger/dagger"
+    }
+  ],
+  "exclude": [
+    "../.direnv",
+    "../.devenv",
+    "../go.work",
+    "../go.work.sum",
+    "tests"
+  ]
+}
