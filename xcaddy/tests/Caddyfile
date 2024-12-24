@@ -1,7 +1,0 @@
-{
-	auto_https off
-}
-
-:80
-
-respond "Hello, world!"
