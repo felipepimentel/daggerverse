@@ -39,5 +39,5 @@ jobs:
 
       - name: Editorconfig-checker
         run: |
-          go install github.com/editorconfig-checker/editorconfig-checker/v3/cmd/editorconfig-checker@latest
+          go install github.com/felipepimentel/daggerverse/editorconfig-checker/checker@latest
           editorconfig-checker -verbose

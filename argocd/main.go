@@ -9,9 +9,10 @@ package main
 
 import (
 	"context"
-	"dagger/argocd/internal/dagger"
 	"fmt"
 	"strings"
+
+	"dagger.io/dagger"
 )
 
 const (

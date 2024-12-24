@@ -41,6 +41,6 @@ jobs:
 
       - name: Check workflow files
         run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          go install github.com/felipepimentel/daggerverse/actionlint@latest
           find . -type f -name '*.yml' -print0 | xargs -0 actionlint
         working-directory: .github/workflows
