@@ -1,7 +1,0 @@
----
-exec:
-  allow:
-    - "^go$"
-    - "^npx$"
-    - "^postcss$"
-    - "^asciidoctor$"
