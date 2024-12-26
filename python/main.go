@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"dagger.io/dagger"
+	"github.com/felipepimentel/daggerverse/python/internal/dagger"
 )
 
 // main é o ponto de entrada do módulo Dagger
