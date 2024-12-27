@@ -8,12 +8,26 @@ import (
 	"dagger/python/internal/dagger"
 )
 
+// PyPIConfig holds PyPI deployment configuration
+type PyPIConfig struct {
+	// Registry URL (default: https://upload.pypi.org/legacy/)
+	Registry string
+	// Token for authentication
+	Token *dagger.Secret
+	// Skip existing versions (default: false)
+	SkipExisting bool
+	// Allow dirty versions (default: false)
+	AllowDirty bool
+}
+
 // Python represents a Python module with Poetry support
 type Python struct {
 	// PythonVersion specifies the Python version to use (default: "3.12")
 	PythonVersion string
 	// PackagePath specifies the path to the package within the source (default: ".")
 	PackagePath string
+	// PyPIConfig holds the PyPI deployment configuration
+	PyPIConfig *PyPIConfig
 }
 
 // WithPythonVersion sets the Python version to use
@@ -25,6 +39,12 @@ func (m *Python) WithPythonVersion(version string) *Python {
 // WithPackagePath sets the package path within the source
 func (m *Python) WithPackagePath(path string) *Python {
 	m.PackagePath = path
+	return m
+}
+
+// WithPyPIConfig sets the PyPI deployment configuration
+func (m *Python) WithPyPIConfig(config *PyPIConfig) *Python {
+	m.PyPIConfig = config
 	return m
 }
 
@@ -45,31 +65,51 @@ func (m *Python) getWorkdir(basePath string) string {
 	return filepath.Join(basePath, m.PackagePath)
 }
 
+// getPyPIRegistry returns the configured PyPI registry URL with a default
+func (m *Python) getPyPIRegistry() string {
+	if m.PyPIConfig == nil || m.PyPIConfig.Registry == "" {
+		return "https://upload.pypi.org/legacy/"
+	}
+	return m.PyPIConfig.Registry
+}
+
 // Publish builds, tests and publishes the Python package to a registry
-func (m *Python) Publish(ctx context.Context, source *dagger.Directory, registry string) (string, error) {
+func (m *Python) Publish(ctx context.Context, source *dagger.Directory) (string, error) {
 	// Run tests before publishing
 	if _, err := m.Test(ctx, source); err != nil {
 		return "", fmt.Errorf("tests failed: %w", err)
 	}
 
 	// Build the package
-	build := m.Build(source)
+	container := m.Build(source)
 
-	// If no registry specified, use TestPyPI as default
-	if registry == "" {
-		registry = "https://test.pypi.org/legacy/"
+	// Configure Poetry for publishing
+	container = container.WithExec([]string{
+		"poetry", "config",
+		"repositories.pypi.url", m.getPyPIRegistry(),
+	})
+
+	// Add authentication if token is provided
+	if m.PyPIConfig != nil && m.PyPIConfig.Token != nil {
+		container = container.
+			WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", m.PyPIConfig.Token)
 	}
 
-	// Publish to the specified registry
-	return build.
-		WithEnvVariable("POETRY_REPOSITORIES_PYPI_URL", registry).
-		WithExec([]string{
-			"poetry", "publish",
-			"--build",
-			"--no-interaction",
-			"--skip-existing",
-		}).
-		Stdout(ctx)
+	// Prepare publish command
+	publishCmd := []string{"poetry", "publish", "--build", "--no-interaction"}
+	
+	// Add optional flags based on configuration
+	if m.PyPIConfig != nil {
+		if m.PyPIConfig.SkipExisting {
+			publishCmd = append(publishCmd, "--skip-existing")
+		}
+		if m.PyPIConfig.AllowDirty {
+			publishCmd = append(publishCmd, "--allow-dirty")
+		}
+	}
+
+	// Execute publish command
+	return container.WithExec(publishCmd).Stdout(ctx)
 }
 
 // Build creates a Python package using Poetry
