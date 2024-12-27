@@ -1,6 +1,9 @@
 {
   "name": "python",
-  "engineVersion": "v0.15.1",
   "sdk": "go",
-  "source": "."
+  "engineVersion": "v0.9.3",
+  "description": "A powerful Dagger module for Python projects using Poetry, providing a streamlined workflow for building, testing, and publishing Python packages",
+  "source": ".",
+  "repository": "github.com/daggerverse/python",
+  "license": "Apache-2.0"
 }

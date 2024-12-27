@@ -265,6 +265,94 @@ dagger call publish --source . --token secret:pypi-token
 - Rotate tokens periodically
 - Use PyPI's trusted publishing when possible (see [PyPI's documentation](https://docs.pypi.org/trusted-publishers/))
 
+## Publishing
+
+This module supports two methods of publishing to the Daggerverse:
+
+### Automatic Publishing
+
+The module will be automatically published to the Daggerverse whenever someone uses it via `dagger call`. This is the recommended approach as it ensures your module is always available when needed.
+
+### Manual Publishing
+
+If you need to manually publish:
+
+```bash
+# 1. Push your changes
+git add .
+git commit -m "feat: your changes"
+git push origin main
+
+# 2. Tag with semantic version
+git tag v1.0.0  # For major version 1
+# or for module in monorepo
+git tag python/v1.0.0
+
+# 3. Push the tag
+git push origin v1.0.0
+```
+
+Then visit the [Daggerverse](https://daggerverse.dev) and click "Publish".
+
+### Versioning
+
+This module follows semantic versioning (`vMAJOR.MINOR.PATCH`) with automated release management using semantic-release.
+
+#### Commit Convention
+
+For monorepo management, use scoped conventional commits:
+
+```bash
+# Format
+type(scope): description
+
+# Examples for Python module
+feat(python): add new testing feature
+fix(python): resolve token handling issue
+docs(python): update installation guide
+perf(python): improve build cache
+```
+
+Commit types that trigger version updates (when scoped to `python`):
+
+- `feat(python): new feature` -> MINOR version bump
+- `fix(python): bug fix` -> PATCH version bump
+- `feat(python)!:` or `fix(python)!:` -> MAJOR version bump
+- `chore(python):`, `docs(python):`, `style(python):`, etc -> No version bump
+
+Commits without the `python` scope or with different scopes won't trigger version updates for this module.
+
+Examples:
+
+```bash
+# Patch release (python/v1.0.0 -> python/v1.0.1)
+git commit -m "fix(python): correct PyPI token handling"
+
+# Minor release (python/v1.0.1 -> python/v1.1.0)
+git commit -m "feat(python): add support for custom test commands"
+
+# Major release (python/v1.1.0 -> python/v2.0.0)
+git commit -m "feat(python)!: change publish API interface"
+
+# No release (commit to another module)
+git commit -m "feat(nodejs): add new feature"
+```
+
+The version will be automatically bumped and tagged (with prefix `python/`) when merging to main branch.
+
+Examples:
+
+- `v1.0.0` - Initial stable release
+- `v1.1.0` - New features added
+- `v1.1.1` - Bug fixes
+- `python/v1.0.0` - When module is in a monorepo
+
+To use a specific version:
+
+```bash
+dagger mod install github.com/daggerverse/python@v1.0.0
+```
+
 ---
 
 Built with ❤️ by the Dagger community

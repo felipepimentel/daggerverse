@@ -1,0 +1,38 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "angular",
+        "releaseRules": [
+          { "type": "feat", "scope": "*", "release": "minor" },
+          { "type": "fix", "scope": "*", "release": "patch" },
+          { "type": "perf", "scope": "*", "release": "patch" },
+          { "breaking": true, "release": "major" }
+        ]
+      }
+    ],
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "${process.env.MODULE_PATH}/CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["${process.env.MODULE_PATH}/CHANGELOG.md"],
+        "message": "chore(${process.env.MODULE_NAME}): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "git tag -a ${process.env.MODULE_NAME}/v${nextRelease.version} -m \"Release ${process.env.MODULE_NAME}/v${nextRelease.version}\"",
+        "publishCmd": "git push origin ${process.env.MODULE_NAME}/v${nextRelease.version}"
+      }
+    ]
+  ]
+}
