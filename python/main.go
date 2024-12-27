@@ -74,7 +74,7 @@ func (m *Python) getPyPIRegistry() string {
 }
 
 // Publish builds, tests and publishes the Python package to a registry
-func (m *Python) Publish(ctx context.Context, source *dagger.Directory) (string, error) {
+func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
 	// Run tests before publishing
 	if _, err := m.Test(ctx, source); err != nil {
 		return "", fmt.Errorf("tests failed: %w", err)
@@ -89,10 +89,18 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory) (string,
 		"repositories.pypi.url", m.getPyPIRegistry(),
 	})
 
+	// Use provided token or fallback to PyPIConfig token
+	publishToken := token
+	if publishToken == nil && m.PyPIConfig != nil {
+		publishToken = m.PyPIConfig.Token
+	}
+
 	// Add authentication if token is provided
-	if m.PyPIConfig != nil && m.PyPIConfig.Token != nil {
+	if publishToken != nil {
 		container = container.
-			WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", m.PyPIConfig.Token)
+			WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", publishToken)
+	} else {
+		return "", fmt.Errorf("PyPI token is required for publishing. Use --token flag or configure PyPIConfig")
 	}
 
 	// Prepare publish command

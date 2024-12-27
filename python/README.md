@@ -221,6 +221,50 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - Start a discussion for feature requests
 - Check existing issues before creating new ones
 
+## CLI Usage
+
+### Secure PyPI Token Handling
+
+You can securely pass your PyPI token when using the module via command line in several ways:
+
+1. **Using environment variable**:
+
+```bash
+# Set the token as environment variable
+export PYPI_TOKEN="your_token_here"
+
+# Use the token from environment
+dagger call publish --source . --token env:PYPI_TOKEN
+```
+
+2. **Using a secret file** (recommended for local development):
+
+```bash
+# Store token in a file (make sure to add it to .gitignore)
+echo "your_token_here" > .pypi_token
+
+# Use the token from file
+dagger call publish --source . --token file:.pypi_token
+```
+
+3. **Using Dagger's secret management** (recommended for CI/CD):
+
+```bash
+# Store the secret in Dagger
+dagger secret create pypi-token "your_token_here"
+
+# Use the stored secret
+dagger call publish --source . --token secret:pypi-token
+```
+
+⚠️ **Security Best Practices**:
+
+- Never commit tokens to version control
+- Add `.pypi_token` to your `.gitignore`
+- Use environment variables in CI/CD pipelines
+- Rotate tokens periodically
+- Use PyPI's trusted publishing when possible (see [PyPI's documentation](https://docs.pypi.org/trusted-publishers/))
+
 ---
 
 Built with ❤️ by the Dagger community
