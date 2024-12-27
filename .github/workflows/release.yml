@@ -74,4 +74,4 @@ jobs:
       - name: Publish to Daggerverse
         if: steps.changed-files.outputs.any_changed == 'true'
         working-directory: ${{ matrix.module }}
-        run: dagger mod publish
+        run: dagger publish
