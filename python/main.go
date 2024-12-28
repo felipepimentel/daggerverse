@@ -58,7 +58,7 @@ type CoverageConfig struct {
 	// Coverage report formats (default: ["term", "xml"])
 	Formats []string
 	// Minimum coverage percentage (default: 0)
-	MinCoverage float64
+	MinCoverage int
 	// Coverage output directory (default: "coverage")
 	OutputDir string
 }
@@ -313,7 +313,7 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 		}
 
 		if config.Coverage.MinCoverage > 0 {
-			args = append(args, fmt.Sprintf("--cov-fail-under=%f", config.Coverage.MinCoverage))
+			args = append(args, fmt.Sprintf("--cov-fail-under=%d", config.Coverage.MinCoverage))
 		}
 
 		args = append(args, "--no-cov-on-fail")
