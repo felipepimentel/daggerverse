@@ -151,20 +151,20 @@ jobs:
 
 ```bash
 # Run tests
-dagger call test --source .
+dagger -m github.com/felipepimentel/daggerverse/python call test --source .
 
 # Run linting
-dagger call lint --source .
+dagger -m github.com/felipepimentel/daggerverse/python call lint --source .
 
 # Run formatting
-dagger call format --source .
+dagger -m github.com/felipepimentel/daggerverse/python call format --source .
 
 # Run CI pipeline
-dagger call ci --source .
+dagger -m github.com/felipepimentel/daggerverse/python call ci --source .
 
 # Run CD pipeline
-dagger call cd --source . --token env:PYPI_TOKEN
+dagger -m github.com/felipepimentel/daggerverse/python call cd --source . --token env:PYPI_TOKEN
 
 # Run complete CI/CD pipeline
-dagger call cicd --source . --token env:PYPI_TOKEN
+dagger -m github.com/felipepimentel/daggerverse/python call cicd --source . --token env:PYPI_TOKEN
 ```

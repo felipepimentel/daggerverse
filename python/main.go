@@ -435,31 +435,26 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		container = container.WithEnvVariable(kv.Key, kv.Value)
 	}
 
-	// Configure Poetry for publishing
-	container = container.WithExec([]string{
-		"poetry", "config",
-		fmt.Sprintf("repositories.%s.url", config.RepositoryName),
-		config.Registry,
-	})
-
-	// Configure token if provided
+	// Create .pypirc file for authentication
 	if token != nil {
-		container = container.WithExec([]string{
-			"poetry", "config",
-			fmt.Sprintf("repositories.%s.username", config.RepositoryName),
-			"__token__",
-		})
-		container = container.WithSecretVariable(
-			fmt.Sprintf("POETRY_%s_PASSWORD", strings.ToUpper(config.RepositoryName)),
-			token,
-		)
+		pypirc := fmt.Sprintf(`[distutils]
+index-servers =
+    pypi
+
+[pypi]
+repository = %s
+username = __token__
+`, config.Registry)
+		
+		container = container.WithNewFile(
+			"/root/.pypirc",
+			pypirc,
+			dagger.ContainerWithNewFileOpts{Permissions: 0600},
+		).WithSecretVariable("POETRY_PYPI_TOKEN", token)
 	}
 
 	// Build publish command
 	args := []string{"poetry", "publish"}
-
-	// Add repository
-	args = append(args, "--repository", config.RepositoryName)
 
 	// Add skip existing flag
 	if config.SkipExisting {
