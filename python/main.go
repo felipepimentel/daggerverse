@@ -245,8 +245,23 @@ type Python struct {
 	GitConfig *GitConfig
 }
 
+// validatePythonVersion validates Python version
+func (m *Python) validatePythonVersion(version string) error {
+	if version == "" {
+		return nil
+	}
+	// Basic version format validation
+	if !strings.HasPrefix(version, "3.") {
+		return fmt.Errorf("unsupported Python version: %s (only Python 3.x is supported)", version)
+	}
+	return nil
+}
+
 // WithPythonVersion sets the Python version to use
 func (m *Python) WithPythonVersion(version string) *Python {
+	if err := m.validatePythonVersion(version); err != nil {
+		panic(err) // Panic is appropriate here as this is a builder pattern
+	}
 	m.PythonVersion = version
 	return m
 }
@@ -304,6 +319,9 @@ func (m *Python) getBaseImage() string {
 	version := m.PythonVersion
 	if version == "" {
 		version = "3.12"
+	}
+	if err := m.validatePythonVersion(version); err != nil {
+		panic(err)
 	}
 	return fmt.Sprintf("python:%s-slim", version)
 }
@@ -948,6 +966,23 @@ func (m *Python) getDefaultGitConfig() *GitConfig {
 	}
 }
 
+// validateGitConfig validates Git configuration
+func (m *Python) validateGitConfig(config *GitConfig) error {
+	if config == nil {
+		return nil
+	}
+	if config.Repository == "" {
+		return fmt.Errorf("repository URL is required")
+	}
+	if _, err := url.Parse(config.Repository); err != nil {
+		return fmt.Errorf("invalid repository URL: %w", err)
+	}
+	if config.Depth < 0 {
+		return fmt.Errorf("depth must be non-negative")
+	}
+	return nil
+}
+
 // Checkout clones a Git repository and returns its directory
 func (m *Python) Checkout(ctx context.Context) (*dagger.Directory, error) {
 	config := m.GitConfig
@@ -955,8 +990,8 @@ func (m *Python) Checkout(ctx context.Context) (*dagger.Directory, error) {
 		config = m.getDefaultGitConfig()
 	}
 
-	if config.Repository == "" {
-		return nil, fmt.Errorf("repository URL is required")
+	if err := m.validateGitConfig(config); err != nil {
+		return nil, err
 	}
 
 	// Start with git container
