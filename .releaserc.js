@@ -1,6 +1,6 @@
 module.exports = {
   branches: ["main"],
-  tagFormat: `${process.env.MODULE_NAME}/v${process.env.npm_package_version}`,
+  tagFormat: "${MODULE_NAME}/v${version}",
   plugins: [
     [
       "@semantic-release/commit-analyzer",
@@ -22,14 +22,15 @@ module.exports = {
     [
       "@semantic-release/changelog",
       {
-        changelogFile: `${process.env.MODULE_PATH}/CHANGELOG.md`,
+        changelogFile: "${MODULE_PATH}/CHANGELOG.md",
       },
     ],
     [
       "@semantic-release/git",
       {
-        assets: [`${process.env.MODULE_PATH}/CHANGELOG.md`],
-        message: `chore(${process.env.MODULE_NAME}): release ${process.env.npm_package_version} [skip ci]\n\n${process.env.npm_package_version}`,
+        assets: ["${MODULE_PATH}/CHANGELOG.md"],
+        message:
+          "chore(${MODULE_NAME}): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
       },
     ],
     [
@@ -41,6 +42,7 @@ module.exports = {
         failComment:
           "The release workflow failed. Please check the logs for more details.",
         releasedLabels: ["released"],
+        addReleases: "bottom",
       },
     ],
   ],
