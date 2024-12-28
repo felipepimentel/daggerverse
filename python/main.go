@@ -1076,3 +1076,37 @@ func (m *Python) Checkout(ctx context.Context) (*dagger.Directory, error) {
 	// Return the cloned directory
 	return container.Directory("."), nil
 }
+
+// CI runs the continuous integration pipeline (test and build)
+func (m *Python) CI(ctx context.Context, source *dagger.Directory) (string, error) {
+	// Run tests
+	testOutput, err := m.Test(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("test failed: %w", err)
+	}
+
+	// Build package
+	container := m.Build(source)
+	if container == nil {
+		return "", fmt.Errorf("build failed: container is nil")
+	}
+
+	return testOutput, nil
+}
+
+// CD runs the continuous delivery pipeline (publish)
+func (m *Python) CD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+	return m.Publish(ctx, source, token)
+}
+
+// CICD runs the complete CI/CD pipeline (test, build, and publish)
+func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+	// Run CI pipeline
+	_, err := m.CI(ctx, source)
+	if err != nil {
+		return "", err
+	}
+
+	// Run CD pipeline
+	return m.CD(ctx, source, token)
+}
