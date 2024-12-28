@@ -316,14 +316,6 @@ func (m *Python) getWorkdir(basePath string) string {
 	return filepath.Join(basePath, m.PackagePath)
 }
 
-// getPyPIRegistry returns the configured PyPI registry URL with a default
-func (m *Python) getPyPIRegistry() string {
-	if m.PyPIConfig == nil || m.PyPIConfig.Registry == "" {
-		return "https://upload.pypi.org/legacy/"
-	}
-	return m.PyPIConfig.Registry
-}
-
 // getDefaultPyPIConfig returns default PyPI configuration
 func (m *Python) getDefaultPyPIConfig() *PyPIConfig {
 	return &PyPIConfig{
