@@ -1,79 +1,93 @@
-# Daggerverse
+# Daggerverse Modules
 
-Collection of Dagger modules for various languages and tools.
+A collection of high-quality Dagger modules designed to streamline your CI/CD workflows. Each module is crafted with best practices, security, and flexibility in mind.
 
-## Development Setup
+## Available Modules
 
-1. Install dependencies:
+### [Python Module](python/README.md)
 
-```bash
-npm install
+A comprehensive Python module that streamlines Poetry-based Python development workflows. Features include:
+
+- 🏗️ Poetry integration and dependency management
+- 🧪 Advanced testing with coverage reporting
+- 📦 Automated package building and publishing
+- 🔄 Built-in Git operations and authentication
+- 🔍 Code quality tools (linting, formatting)
+- 📚 Documentation generation
+- 💾 Optimized caching
+
+## Getting Started
+
+1. **Prerequisites**:
+
+   - [Dagger CLI](https://docs.dagger.io/cli/465058/install)
+   - Go 1.21 or later
+
+2. **Installation**:
+
+   ```bash
+   # Import the desired module
+   dagger mod use github.com/felipepimentel/daggerverse/python@latest
+   ```
+
+3. **Usage**:
+   ```go
+   // See individual module documentation for detailed usage examples
+   ```
+
+## Module Structure
+
+Each module follows a consistent structure:
+
+```
+module/
+├── README.md           # Module documentation
+├── dagger.json         # Module configuration
+├── main.go            # Module implementation
+└── examples/          # Usage examples
 ```
 
-2. Setup git hooks:
+## Development
 
-```bash
-npm run prepare
-```
+### Requirements
 
-## Commit Convention
+- Go 1.21+
+- Dagger CLI
+- Git
 
-This repository enforces conventional commits with scopes. Your commits must follow this pattern:
+### Setup
 
-```bash
-type(scope): description
+1. Clone the repository:
 
-# Examples:
-feat(python): add new testing feature
-fix(python): resolve token handling
-docs(global): update main README
-```
+   ```bash
+   git clone https://github.com/felipepimentel/daggerverse.git
+   cd daggerverse
+   ```
 
-### Types
+2. Install dependencies:
 
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Code style changes
-- `refactor`: Code changes that neither fix bugs nor add features
-- `perf`: Performance improvements
-- `test`: Adding or updating tests
-- `build`: Build system or external dependencies
-- `ci`: CI/CD changes
-- `chore`: Other changes that don't modify src or test files
-- `revert`: Reverts a previous commit
+   ```bash
+   go mod download
+   ```
 
-### Scopes
+3. Run tests:
+   ```bash
+   dagger test
+   ```
 
-- `python`: Python module changes
-- `nodejs`: Node.js module changes
-- `ruby`: Ruby module changes
-- `global`: Repository-wide changes
+## Contributing
 
-### Rules
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on:
 
-- Type must be one of the allowed types
-- Scope is required and must be one of the defined scopes
-- Description must be in lower case
-- Breaking changes must be indicated by `!` after the type/scope
+- Code of Conduct
+- Development process
+- Commit message format
+- Pull request process
 
-### Examples
+## License
 
-```bash
-# ✅ Good commits:
-feat(python): add new testing feature
-fix(python): resolve token handling issue
-docs(global): update main readme
-feat(python)!: change api interface
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-# ❌ Bad commits:
-feat: add feature            # Missing scope
-fix(invalid): something      # Invalid scope
-feat(python): Add Feature    # Upper case in description
-chore: some change          # Missing scope
-```
+## Security
 
-## Modules
-
-- [Python](python/README.md) - Python module with Poetry support
-- [More modules coming soon...]
+For security concerns, please see our [Security Policy](SECURITY.md).

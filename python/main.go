@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -196,6 +197,32 @@ type DocsConfig struct {
 	ExtraArgs []string
 }
 
+// GitConfig holds configuration for Git operations
+type GitConfig struct {
+	// Repository URL to clone
+	Repository string
+	// Branch or tag to checkout (default: main)
+	Ref string
+	// Depth of git history to clone (default: 1)
+	Depth int
+	// Whether to fetch all history (default: false)
+	FetchAll bool
+	// Whether to fetch all tags (default: false)
+	FetchTags bool
+	// Whether to fetch submodules (default: false)
+	Submodules bool
+	// Authentication token for private repositories
+	Token *dagger.Secret
+	// SSH key for authentication
+	SSHKey *dagger.Secret
+	// Known hosts file content for SSH authentication
+	KnownHosts string
+	// Additional git configuration
+	Config []KeyValue
+	// Environment variables for git operations
+	Env []KeyValue
+}
+
 // Python represents a Python module with Poetry support
 type Python struct {
 	// PythonVersion specifies the Python version to use (default: "3.12")
@@ -214,6 +241,8 @@ type Python struct {
 	FormatConfig *FormatConfig
 	// DocsConfig holds the documentation configuration
 	DocsConfig *DocsConfig
+	// GitConfig holds the Git configuration
+	GitConfig *GitConfig
 }
 
 // WithPythonVersion sets the Python version to use
@@ -261,6 +290,12 @@ func (m *Python) WithFormatConfig(config *FormatConfig) *Python {
 // WithDocsConfig sets the documentation configuration
 func (m *Python) WithDocsConfig(config *DocsConfig) *Python {
 	m.DocsConfig = config
+	return m
+}
+
+// WithGitConfig sets the Git configuration
+func (m *Python) WithGitConfig(config *GitConfig) *Python {
+	m.GitConfig = config
 	return m
 }
 
@@ -889,4 +924,111 @@ func (m *Python) BuildDocs(ctx context.Context, source *dagger.Directory) (strin
 	args = append(args, config.ExtraArgs...)
 
 	return container.WithExec(args).Stdout(ctx)
+}
+
+// getDefaultGitConfig returns default Git configuration
+func (m *Python) getDefaultGitConfig() *GitConfig {
+	return &GitConfig{
+		Ref: "main",
+		Depth: 1,
+		FetchAll: false,
+		FetchTags: false,
+		Submodules: false,
+		Config: []KeyValue{},
+		Env: []KeyValue{},
+	}
+}
+
+// Checkout clones a Git repository and returns its directory
+func (m *Python) Checkout(ctx context.Context) (*dagger.Directory, error) {
+	config := m.GitConfig
+	if config == nil {
+		config = m.getDefaultGitConfig()
+	}
+
+	if config.Repository == "" {
+		return nil, fmt.Errorf("repository URL is required")
+	}
+
+	// Start with git container
+	container := dag.Container().
+		From("alpine/git:latest")
+
+	// Add environment variables
+	for _, kv := range config.Env {
+		container = container.WithEnvVariable(kv.Key, kv.Value)
+	}
+
+	// Add git configuration
+	for _, kv := range config.Config {
+		container = container.WithExec([]string{
+			"git", "config", "--global",
+			kv.Key, kv.Value,
+		})
+	}
+
+	// Setup authentication if needed
+	if config.Token != nil {
+		repoURL, err := url.Parse(config.Repository)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository URL: %w", err)
+		}
+
+		// Add token to URL
+		token, err := config.Token.Plaintext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token: %w", err)
+		}
+		repoURL.User = url.UserPassword("git", token)
+		config.Repository = repoURL.String()
+	} else if config.SSHKey != nil {
+		// Create SSH directory
+		container = container.WithExec([]string{
+			"mkdir", "-p", "/root/.ssh",
+		})
+
+		// Write SSH key
+		sshKey, err := config.SSHKey.Plaintext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get SSH key: %w", err)
+		}
+		container = container.WithNewFile("/root/.ssh/id_rsa", sshKey, dagger.ContainerWithNewFileOpts{
+			Permissions: 0600,
+		})
+
+		if config.KnownHosts != "" {
+			container = container.WithNewFile("/root/.ssh/known_hosts", config.KnownHosts, dagger.ContainerWithNewFileOpts{
+				Permissions: 0600,
+			})
+		}
+	}
+
+	// Prepare clone command
+	cloneArgs := []string{
+		"clone",
+		"--branch", config.Ref,
+	}
+
+	if !config.FetchAll {
+		if config.Depth > 0 {
+			cloneArgs = append(cloneArgs, "--depth", fmt.Sprintf("%d", config.Depth))
+		}
+		if !config.FetchTags {
+			cloneArgs = append(cloneArgs, "--no-tags")
+		}
+	}
+
+	if !config.Submodules {
+		cloneArgs = append(cloneArgs, "--no-recurse-submodules")
+	}
+
+	cloneArgs = append(cloneArgs, config.Repository, ".")
+
+	// Clone repository
+	container = container.
+		WithWorkdir("/src").
+		WithExec(cloneArgs)
+
+	// Return the cloned directory
+	return container.Directory("."), nil
 }
