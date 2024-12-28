@@ -60,7 +60,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODULE_PATH: ${{ matrix.module }}
           MODULE_NAME: ${{ matrix.module }}
-        run: npx semantic-release
+        run: |
+          echo "MODULE_NAME=${{ matrix.module }}" >> $GITHUB_ENV
+          echo "MODULE_PATH=${{ matrix.module }}" >> $GITHUB_ENV
+          npx semantic-release
 
       - name: Setup Dagger
         uses: dagger/dagger-for-github@v6
