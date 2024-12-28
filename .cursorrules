@@ -1,0 +1,133 @@
+# Cursor Rules for Daggerverse
+
+## Commit Message Format
+
+```
+type(scope): subject
+
+[optional body]
+
+[optional footer(s)]
+```
+
+## Types
+
+- `feat`: A new feature (minor version)
+- `fix`: A bug fix (patch version)
+- `perf`: A code change that improves performance (patch version)
+- `docs`: Documentation only changes (patch version)
+- `style`: Changes that do not affect the meaning of the code
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `test`: Adding missing tests or correcting existing tests
+- `build`: Changes that affect the build system or external dependencies
+- `ci`: Changes to our CI configuration files and scripts
+- `chore`: Other changes that don't modify src or test files
+
+## Scopes
+
+- `python`: Changes to the Python module
+- `nodejs`: Changes to the Node.js module
+- `ruby`: Changes to the Ruby module
+- `global`: Repository-wide changes
+
+## Breaking Changes
+
+Breaking changes must be indicated by:
+
+1. `!` after the type/scope
+2. `BREAKING CHANGE:` in the footer
+
+Example:
+
+```
+feat(python)!: change module API interface
+
+BREAKING CHANGE: The BuildConfig interface now requires explicit cache configuration
+```
+
+## Examples
+
+### Features
+
+```
+feat(python): add support for custom test runners
+feat(python): implement parallel test execution
+feat(python): add coverage reporting options
+```
+
+### Bug Fixes
+
+```
+fix(python): resolve PyPI token handling
+fix(python): correct cache path for Poetry
+fix(python): handle missing dependencies gracefully
+```
+
+### Documentation
+
+```
+docs(python): improve API documentation
+docs(python): add usage examples
+docs(python): update installation guide
+```
+
+### Performance
+
+```
+perf(python): optimize build cache handling
+perf(python): improve dependency resolution
+perf(python): reduce container size
+```
+
+### Breaking Changes
+
+```
+feat(python)!: redesign configuration interface
+fix(python)!: change default behaviors
+perf(python)!: modify caching strategy
+```
+
+## Rules
+
+1. Subject line:
+
+   - Must be in present tense
+   - Must not end with a period
+   - Must be 72 characters or less
+   - Must start with lowercase
+
+2. Body:
+
+   - Must have a blank line after subject
+   - Each line must be 72 characters or less
+   - Should explain what and why, not how
+
+3. Breaking Changes:
+
+   - Must include both `!` and `BREAKING CHANGE:` footer
+   - Must describe the breaking change in detail
+   - Must provide migration instructions if possible
+
+4. Scope:
+   - Must be one of the defined scopes
+   - Must be lowercase
+   - Must be in parentheses
+
+## Automatic Versioning
+
+Commits will trigger version updates based on:
+
+- `feat(python)`: Minor version (1.1.0)
+- `fix(python)`: Patch version (1.0.1)
+- `perf(python)`: Patch version (1.0.1)
+- `docs(python)`: Patch version (1.0.1)
+- Breaking change: Major version (2.0.0)
+
+## Tag Format
+
+Tags will be generated in the format:
+
+```
+<module>/v<version>
+Example: python/v1.2.3
+```
