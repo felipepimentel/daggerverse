@@ -49,6 +49,18 @@ type TestConfig struct {
 	ExtraArgs []string
 	// Environment variables for tests
 	Env []KeyValue
+	// Test markers to select
+	Markers []string
+	// Test paths to run (default: ".")
+	TestPaths []string
+	// Skip installing test dependencies (default: false)
+	SkipInstall bool
+	// JUnit XML report path
+	JUnitXML string
+	// Maximum test duration in seconds (0 for no limit)
+	MaxTestTime int
+	// Stop on first failure (default: false)
+	FailFast bool
 }
 
 // CoverageConfig holds coverage reporting configuration
@@ -61,6 +73,16 @@ type CoverageConfig struct {
 	MinCoverage int
 	// Coverage output directory (default: "coverage")
 	OutputDir string
+	// Paths to include in coverage
+	Include []string
+	// Paths to exclude from coverage
+	Exclude []string
+	// Show missing lines in report (default: true)
+	ShowMissing bool
+	// Branch coverage (default: false)
+	Branch bool
+	// Context lines in report (default: 0)
+	Context int
 }
 
 // BuildConfig holds Poetry build configuration
@@ -75,6 +97,16 @@ type BuildConfig struct {
 	Env []KeyValue
 	// Cache configuration
 	Cache *CacheConfig
+	// Poetry dependency groups to install (default: ["dev"])
+	DependencyGroups []string
+	// Poetry optional dependencies to install
+	OptionalDependencies []string
+	// Skip installing dependencies (default: false)
+	SkipDependencies bool
+	// Install only selected dependency groups (default: false)
+	OnlyGroups bool
+	// Skip installing the root package (default: true)
+	SkipRoot bool
 }
 
 // CacheConfig holds cache configuration
@@ -269,8 +301,19 @@ func (m *Python) getDefaultTestConfig() *TestConfig {
 			Formats: []string{"term", "xml"},
 			MinCoverage: 0,
 			OutputDir: "coverage",
+			Include: []string{},
+			Exclude: []string{},
+			ShowMissing: true,
+			Branch: false,
+			Context: 0,
 		},
 		Env: []KeyValue{},
+		Markers: []string{},
+		TestPaths: []string{"."},
+		SkipInstall: false,
+		JUnitXML: "",
+		MaxTestTime: 0,
+		FailFast: false,
 	}
 }
 
@@ -281,7 +324,16 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 		config = m.getDefaultTestConfig()
 	}
 
-	container := m.BuildEnv(source)
+	// Build environment unless skipped
+	var container *dagger.Container
+	if !config.SkipInstall {
+		container = m.BuildEnv(source)
+	} else {
+		container = dag.Container().
+			From(m.getBaseImage()).
+			WithDirectory("/app", source).
+			WithWorkdir(m.getWorkdir("/app"))
+	}
 
 	// Add environment variables
 	for _, kv := range config.Env {
@@ -316,8 +368,51 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 			args = append(args, fmt.Sprintf("--cov-fail-under=%d", config.Coverage.MinCoverage))
 		}
 
+		if len(config.Coverage.Include) > 0 {
+			args = append(args, "--cov-include=" + strings.Join(config.Coverage.Include, ","))
+		}
+
+		if len(config.Coverage.Exclude) > 0 {
+			args = append(args, "--cov-exclude=" + strings.Join(config.Coverage.Exclude, ","))
+		}
+
+		if config.Coverage.ShowMissing {
+			args = append(args, "--cov-report=term-missing")
+		}
+
+		if config.Coverage.Branch {
+			args = append(args, "--cov-branch")
+		}
+
+		if config.Coverage.Context > 0 {
+			args = append(args, fmt.Sprintf("--cov-context=%d", config.Coverage.Context))
+		}
+
 		args = append(args, "--no-cov-on-fail")
 	}
+
+	// Add test markers
+	for _, marker := range config.Markers {
+		args = append(args, "-m", marker)
+	}
+
+	// Add JUnit XML report
+	if config.JUnitXML != "" {
+		args = append(args, fmt.Sprintf("--junitxml=%s", config.JUnitXML))
+	}
+
+	// Add max test time
+	if config.MaxTestTime > 0 {
+		args = append(args, fmt.Sprintf("--maxtime=%d", config.MaxTestTime))
+	}
+
+	// Add fail fast
+	if config.FailFast {
+		args = append(args, "--exitfirst")
+	}
+
+	// Add test paths
+	args = append(args, config.TestPaths...)
 
 	// Add any extra arguments
 	args = append(args, config.ExtraArgs...)
@@ -338,6 +433,11 @@ func (m *Python) getDefaultBuildConfig() *BuildConfig {
 			PipCacheVolume: "pip-cache",
 			PoetryCacheVolume: "poetry-cache",
 		},
+		DependencyGroups: []string{"dev"},
+		OptionalDependencies: []string{},
+		SkipDependencies: false,
+		OnlyGroups: false,
+		SkipRoot: true,
 	}
 }
 
@@ -397,13 +497,39 @@ func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 		})
 	}
 
+	// Skip dependency installation if requested
+	if config.SkipDependencies {
+		return container
+	}
+
 	// Install project dependencies
 	installArgs := []string{
 		"poetry", "install",
 		"--no-interaction",
-		"--no-root",
-		"--with", "dev",
 	}
+
+	// Handle root package installation
+	if config.SkipRoot {
+		installArgs = append(installArgs, "--no-root")
+	}
+
+	// Handle dependency groups
+	if len(config.DependencyGroups) > 0 {
+		if config.OnlyGroups {
+			installArgs = append(installArgs, "--only")
+		} else {
+			installArgs = append(installArgs, "--with")
+		}
+		installArgs = append(installArgs, strings.Join(config.DependencyGroups, ","))
+	}
+
+	// Handle optional dependencies
+	if len(config.OptionalDependencies) > 0 {
+		installArgs = append(installArgs, "--extras")
+		installArgs = append(installArgs, strings.Join(config.OptionalDependencies, ","))
+	}
+
+	// Add build arguments
 	installArgs = append(installArgs, config.BuildArgs...)
 	
 	return container.WithExec(installArgs)
