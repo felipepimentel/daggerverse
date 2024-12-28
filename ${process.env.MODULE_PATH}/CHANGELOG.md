@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.1...python/v1.2.2) (2024-12-28)
+
+
+### Bug Fixes
+
+* **python:** change MinCoverage type from float64 to int ([c767399](https://github.com/felipepimentel/daggerverse/commit/c7673992520670a87f74661fea76421369157c18))
+
 ## [1.2.1](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.0...python/v1.2.1) (2024-12-28)
 
 
