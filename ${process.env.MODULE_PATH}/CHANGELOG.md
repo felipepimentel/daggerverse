@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.0...python/v1.2.1) (2024-12-28)
+
+
+### Bug Fixes
+
+* **python:** replace map types with KeyValue struct ([e704f70](https://github.com/felipepimentel/daggerverse/commit/e704f7062677ae2df174019d8b27a4202e0f7124))
+
 # [1.2.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.1.0...python/v1.2.0) (2024-12-28)
 
 
