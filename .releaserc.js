@@ -35,7 +35,8 @@ module.exports = {
     [
       "@semantic-release/github",
       {
-        successComment: `🎉 This PR is included in version ${process.env.npm_package_version}`,
+        successComment:
+          "🎉 This PR is included in version ${nextRelease.version}",
         failTitle: "The release workflow failed",
         failComment:
           "The release workflow failed. Please check the logs for more details.",
