@@ -330,11 +330,28 @@ func (m *Python) getDefaultPyPIConfig() *PyPIConfig {
 	}
 }
 
+// validatePyPIConfig validates PyPI configuration
+func (m *Python) validatePyPIConfig(config *PyPIConfig) error {
+	if config == nil {
+		return nil
+	}
+	if config.Registry != "" {
+		if _, err := url.Parse(config.Registry); err != nil {
+			return fmt.Errorf("invalid registry URL: %w", err)
+		}
+	}
+	return nil
+}
+
 // Publish builds, tests and publishes the Python package to a registry
 func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
 	config := m.PyPIConfig
 	if config == nil {
 		config = m.getDefaultPyPIConfig()
+	}
+
+	if err := m.validatePyPIConfig(config); err != nil {
+		return "", err
 	}
 
 	// Run tests before publishing unless verification is skipped
