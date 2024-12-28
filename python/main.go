@@ -408,6 +408,13 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		return "", err
 	}
 
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
+	}
+
 	// Run tests before publishing unless verification is skipped
 	if !config.SkipVerify {
 		if _, err := m.Test(ctx, source); err != nil {
@@ -435,47 +442,40 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		config.Registry,
 	})
 
-	// Get token from provided token, environment, or config
-	publishToken := token
-	if publishToken == nil {
-		var err error
-		publishToken, err = m.getEnvOrSecret("PYPI_TOKEN", "")
-		if err != nil {
-			return "", err
-		}
+	// Configure token if provided
+	if token != nil {
+		container = container.WithExec([]string{
+			"poetry", "config",
+			fmt.Sprintf("repositories.%s.username", config.RepositoryName),
+			"__token__",
+		})
+		container = container.WithSecretVariable(
+			fmt.Sprintf("POETRY_%s_PASSWORD", strings.ToUpper(config.RepositoryName)),
+			token,
+		)
 	}
 
-	// Add authentication
-	container = container.WithSecretVariable(
-		"POETRY_PYPI_TOKEN_PYPI",
-		publishToken,
-	)
+	// Build publish command
+	args := []string{"poetry", "publish"}
 
-	// Prepare publish command
-	publishCmd := []string{
-		"poetry", "publish",
-		"--repository", config.RepositoryName,
-		"--no-interaction",
-	}
+	// Add repository
+	args = append(args, "--repository", config.RepositoryName)
 
-	// Add build flag if not skipping build
-	if !config.SkipBuild {
-		publishCmd = append(publishCmd, "--build")
-	}
-
-	// Add optional flags
+	// Add skip existing flag
 	if config.SkipExisting {
-		publishCmd = append(publishCmd, "--skip-existing")
+		args = append(args, "--skip-existing")
 	}
+
+	// Add allow dirty flag
 	if config.AllowDirty {
-		publishCmd = append(publishCmd, "--allow-dirty")
+		args = append(args, "--allow-dirty")
 	}
 
-	// Add any extra arguments
-	publishCmd = append(publishCmd, config.ExtraArgs...)
+	// Add extra arguments
+	args = append(args, config.ExtraArgs...)
 
-	// Execute publish command
-	return container.WithExec(publishCmd).Stdout(ctx)
+	// Run publish command
+	return container.WithWorkdir(filepath.Join("/app", projectPath)).WithExec(args).Stdout(ctx)
 }
 
 // Build creates a Python package using Poetry
@@ -515,11 +515,18 @@ func (m *Python) getDefaultTestConfig() *TestConfig {
 	}
 }
 
-// Test runs the test suite using pytest with coverage reporting
+// Test runs pytest with the specified configuration
 func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, error) {
 	config := m.TestConfig
 	if config == nil {
 		config = m.getDefaultTestConfig()
+	}
+
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
 	}
 
 	// Build environment unless skipped
@@ -530,7 +537,7 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 		container = dag.Container().
 			From(m.getBaseImage()).
 			WithDirectory("/app", source).
-			WithWorkdir(m.getWorkdir("/app"))
+			WithWorkdir(filepath.Join("/app", projectPath))
 	}
 
 	// Add environment variables
@@ -549,7 +556,7 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 	}
 
 	if config.Coverage != nil && config.Coverage.Enabled {
-		args = append(args, fmt.Sprintf("--cov=%s", m.PackagePath))
+		args = append(args, fmt.Sprintf("--cov=%s", projectPath))
 		
 		for _, format := range config.Coverage.Formats {
 			switch format {
@@ -610,7 +617,11 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 	}
 
 	// Add test paths
-	args = append(args, config.TestPaths...)
+	if len(config.TestPaths) > 0 {
+		args = append(args, config.TestPaths...)
+	} else {
+		args = append(args, projectPath)
+	}
 
 	// Add any extra arguments
 	args = append(args, config.ExtraArgs...)
@@ -639,13 +650,21 @@ func (m *Python) getDefaultBuildConfig() *BuildConfig {
 	}
 }
 
-// BuildEnv prepares a Python development environment with Poetry
+// BuildEnv creates a container with Python and Poetry installed
 func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 	config := m.BuildConfig
 	if config == nil {
 		config = m.getDefaultBuildConfig()
 	}
 
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
+	}
+
+	// Initialize container
 	container := dag.Container().From(m.getBaseImage())
 
 	// Add environment variables
@@ -668,7 +687,7 @@ func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 	// Add source code
 	container = container.
 		WithDirectory("/app", source).
-		WithWorkdir(m.getWorkdir("/app"))
+		WithWorkdir(filepath.Join("/app", projectPath))
 
 	// Install base dependencies
 	container = container.WithExec([]string{
@@ -781,6 +800,13 @@ func (m *Python) Lint(ctx context.Context, source *dagger.Directory) (string, er
 		return "Linting skipped", nil
 	}
 
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
+	}
+
 	container := m.BuildEnv(source)
 
 	// Install ruff if not in extra dependencies
@@ -834,7 +860,7 @@ func (m *Python) Lint(ctx context.Context, source *dagger.Directory) (string, er
 	args = append(args, config.ExtraArgs...)
 
 	// Add target path
-	args = append(args, m.PackagePath)
+	args = append(args, projectPath)
 
 	return container.WithExec(args).Stdout(ctx)
 }
@@ -848,6 +874,13 @@ func (m *Python) Format(ctx context.Context, source *dagger.Directory) (string, 
 
 	if !config.Enabled {
 		return "Formatting skipped", nil
+	}
+
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
 	}
 
 	container := m.BuildEnv(source)
@@ -898,7 +931,7 @@ func (m *Python) Format(ctx context.Context, source *dagger.Directory) (string, 
 	args = append(args, config.ExtraArgs...)
 
 	// Add target path
-	args = append(args, m.PackagePath)
+	args = append(args, projectPath)
 
 	return container.WithExec(args).Stdout(ctx)
 }
@@ -942,6 +975,13 @@ func (m *Python) BuildDocs(ctx context.Context, source *dagger.Directory) (strin
 		return "Documentation generation skipped", nil
 	}
 
+	// Find pyproject.toml location
+	projectPath, err := m.findPyProjectToml(source)
+	if err != nil {
+		// If not found, use default package path
+		projectPath = m.PackagePath
+	}
+
 	container := m.BuildEnv(source)
 
 	// Install documentation dependencies
@@ -966,8 +1006,8 @@ func (m *Python) BuildDocs(ctx context.Context, source *dagger.Directory) (strin
 		args = []string{
 			"sphinx-build",
 			"-b", config.Format,
-			config.SourceDir,
-			filepath.Join(config.OutputDir, config.Format),
+			filepath.Join(projectPath, config.SourceDir),
+			filepath.Join(projectPath, config.OutputDir, config.Format),
 		}
 		if config.ProjectName != "" {
 			args = append(args, "-D", fmt.Sprintf("project=%s", config.ProjectName))
@@ -1113,36 +1153,83 @@ func (m *Python) Checkout(ctx context.Context) (*dagger.Directory, error) {
 	return container.Directory("."), nil
 }
 
-// CI runs the continuous integration pipeline (test and build)
+// CI runs the Continuous Integration pipeline (test and build)
 func (m *Python) CI(ctx context.Context, source *dagger.Directory) (string, error) {
-	// Run tests
-	testOutput, err := m.Test(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("test failed: %w", err)
+	// Run tests first
+	if _, err := m.Test(ctx, source); err != nil {
+		return "", fmt.Errorf("tests failed: %w", err)
 	}
 
-	// Build package
+	// Then build
 	container := m.Build(source)
 	if container == nil {
 		return "", fmt.Errorf("build failed: container is nil")
 	}
 
-	return testOutput, nil
+	return "CI pipeline completed successfully", nil
 }
 
-// CD runs the continuous delivery pipeline (publish)
+// CD runs the Continuous Delivery pipeline (publish to PyPI)
 func (m *Python) CD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	return m.Publish(ctx, source, token)
+	// Get token from provided token or environment
+	publishToken := token
+	if publishToken == nil {
+		var err error
+		publishToken, err = m.getEnvOrSecret("PYPI_TOKEN", "")
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Publish to PyPI
+	return m.Publish(ctx, source, publishToken)
 }
 
 // CICD runs the complete CI/CD pipeline (test, build, and publish)
 func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	// Run CI pipeline
-	_, err := m.CI(ctx, source)
-	if err != nil {
+	// Run CI first
+	if _, err := m.CI(ctx, source); err != nil {
 		return "", err
 	}
 
-	// Run CD pipeline
+	// Then run CD
 	return m.CD(ctx, source, token)
+}
+
+// findPyProjectToml recursively searches for pyproject.toml file
+func (m *Python) findPyProjectToml(source *dagger.Directory) (string, error) {
+	// First try the package path
+	if m.PackagePath != "" {
+		if _, err := source.File(filepath.Join(m.PackagePath, "pyproject.toml")).Contents(context.Background()); err == nil {
+			return m.PackagePath, nil
+		}
+	}
+
+	// Then try root directory
+	if _, err := source.File("pyproject.toml").Contents(context.Background()); err == nil {
+		return ".", nil
+	}
+
+	// Finally, search recursively
+	entries, err := source.Entries(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("failed to list directory entries: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry == "pyproject.toml" {
+			return ".", nil
+		}
+		
+		// Check if it's a directory
+		if _, err := source.Directory(entry).ID(context.Background()); err == nil {
+			// Recursively search in subdirectory
+			subdir := source.Directory(entry)
+			if path, err := m.findPyProjectToml(subdir); err == nil {
+				return filepath.Join(entry, path), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("pyproject.toml not found in the source directory")
 }
