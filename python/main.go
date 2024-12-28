@@ -120,6 +120,82 @@ type CacheConfig struct {
 	PoetryCacheVolume string
 }
 
+// LintConfig holds configuration for code linting
+type LintConfig struct {
+	// Enable ruff linting (default: true)
+	Enabled bool
+	// Linting rules to enable
+	Select []string
+	// Linting rules to ignore
+	Ignore []string
+	// Files or directories to exclude
+	Exclude []string
+	// Maximum line length (default: 88)
+	LineLength int
+	// Fix issues automatically (default: false)
+	Fix bool
+	// Show source code for each error (default: true)
+	ShowSource bool
+	// Format output (options: text, json, junit)
+	Format string
+	// Output file path
+	Output string
+	// Additional ruff arguments
+	ExtraArgs []string
+}
+
+// FormatConfig holds configuration for code formatting
+type FormatConfig struct {
+	// Enable black formatting (default: true)
+	Enabled bool
+	// Line length (default: 88)
+	LineLength int
+	// Skip string normalization (default: false)
+	SkipStringNormalization bool
+	// Target specific Python versions
+	TargetVersion []string
+	// Include files/patterns
+	Include []string
+	// Exclude files/patterns
+	Exclude []string
+	// Check only (no changes) (default: false)
+	Check bool
+	// Show diff of changes (default: true)
+	ShowDiff bool
+	// Additional black arguments
+	ExtraArgs []string
+}
+
+// DocsConfig holds configuration for documentation generation
+type DocsConfig struct {
+	// Enable documentation generation (default: true)
+	Enabled bool
+	// Documentation tool to use (options: sphinx, mkdocs)
+	Tool string
+	// Documentation source directory (default: "docs")
+	SourceDir string
+	// Documentation output directory (default: "site")
+	OutputDir string
+	// Documentation format (options: html, pdf, epub)
+	Format string
+	// Documentation theme
+	Theme string
+	// Project name
+	ProjectName string
+	// Project version
+	Version string
+	// Project author
+	Author string
+	// Additional extensions to enable
+	Extensions []string
+	// Additional dependencies to install
+	ExtraDependencies []string
+	// Environment variables for documentation build
+	Env []KeyValue
+	// Additional build arguments
+	ExtraArgs []string
+}
+
 // Python represents a Python module with Poetry support
 type Python struct {
 	// PythonVersion specifies the Python version to use (default: "3.12")
@@ -132,6 +208,12 @@ type Python struct {
 	TestConfig *TestConfig
 	// BuildConfig holds the build configuration
 	BuildConfig *BuildConfig
+	// LintConfig holds the linting configuration
+	LintConfig *LintConfig
+	// FormatConfig holds the formatting configuration
+	FormatConfig *FormatConfig
+	// DocsConfig holds the documentation configuration
+	DocsConfig *DocsConfig
 }
 
 // WithPythonVersion sets the Python version to use
@@ -161,6 +243,24 @@ func (m *Python) WithTestConfig(config *TestConfig) *Python {
 // WithBuildConfig sets the build configuration
 func (m *Python) WithBuildConfig(config *BuildConfig) *Python {
 	m.BuildConfig = config
+	return m
+}
+
+// WithLintConfig sets the linting configuration
+func (m *Python) WithLintConfig(config *LintConfig) *Python {
+	m.LintConfig = config
+	return m
+}
+
+// WithFormatConfig sets the formatting configuration
+func (m *Python) WithFormatConfig(config *FormatConfig) *Python {
+	m.FormatConfig = config
+	return m
+}
+
+// WithDocsConfig sets the documentation configuration
+func (m *Python) WithDocsConfig(config *DocsConfig) *Python {
+	m.DocsConfig = config
 	return m
 }
 
@@ -533,4 +633,260 @@ func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 	installArgs = append(installArgs, config.BuildArgs...)
 	
 	return container.WithExec(installArgs)
+}
+
+// getDefaultLintConfig returns default linting configuration
+func (m *Python) getDefaultLintConfig() *LintConfig {
+	return &LintConfig{
+		Enabled: true,
+		Select: []string{
+			"E", "F", "W",  // pycodestyle, pyflakes, warnings
+			"I",            // isort
+			"N",            // pep8-naming
+			"UP",           // pyupgrade
+			"RUF",          // ruff-specific
+		},
+		Ignore: []string{},
+		Exclude: []string{},
+		LineLength: 88,
+		Fix: false,
+		ShowSource: true,
+		Format: "text",
+		Output: "",
+		ExtraArgs: []string{},
+	}
+}
+
+// getDefaultFormatConfig returns default formatting configuration
+func (m *Python) getDefaultFormatConfig() *FormatConfig {
+	return &FormatConfig{
+		Enabled: true,
+		LineLength: 88,
+		SkipStringNormalization: false,
+		TargetVersion: []string{},
+		Include: []string{},
+		Exclude: []string{},
+		Check: false,
+		ShowDiff: true,
+		ExtraArgs: []string{},
+	}
+}
+
+// Lint runs code linting using ruff
+func (m *Python) Lint(ctx context.Context, source *dagger.Directory) (string, error) {
+	config := m.LintConfig
+	if config == nil {
+		config = m.getDefaultLintConfig()
+	}
+
+	if !config.Enabled {
+		return "Linting skipped", nil
+	}
+
+	container := m.BuildEnv(source)
+
+	// Install ruff if not in extra dependencies
+	container = container.WithExec([]string{
+		"pip", "install", "--no-cache-dir", "ruff",
+	})
+
+	args := []string{"ruff", "check"}
+
+	// Add selected rules
+	if len(config.Select) > 0 {
+		args = append(args, "--select", strings.Join(config.Select, ","))
+	}
+
+	// Add ignored rules
+	if len(config.Ignore) > 0 {
+		args = append(args, "--ignore", strings.Join(config.Ignore, ","))
+	}
+
+	// Add excluded patterns
+	if len(config.Exclude) > 0 {
+		args = append(args, "--exclude", strings.Join(config.Exclude, ","))
+	}
+
+	// Add line length
+	if config.LineLength > 0 {
+		args = append(args, "--line-length", fmt.Sprintf("%d", config.LineLength))
+	}
+
+	// Add fix flag
+	if config.Fix {
+		args = append(args, "--fix")
+	}
+
+	// Add show source flag
+	if config.ShowSource {
+		args = append(args, "--show-source")
+	}
+
+	// Add format
+	if config.Format != "" {
+		args = append(args, "--format", config.Format)
+	}
+
+	// Add output file
+	if config.Output != "" {
+		args = append(args, "--output", config.Output)
+	}
+
+	// Add extra arguments
+	args = append(args, config.ExtraArgs...)
+
+	// Add target path
+	args = append(args, m.PackagePath)
+
+	return container.WithExec(args).Stdout(ctx)
+}
+
+// Format runs code formatting using black
+func (m *Python) Format(ctx context.Context, source *dagger.Directory) (string, error) {
+	config := m.FormatConfig
+	if config == nil {
+		config = m.getDefaultFormatConfig()
+	}
+
+	if !config.Enabled {
+		return "Formatting skipped", nil
+	}
+
+	container := m.BuildEnv(source)
+
+	// Install black if not in extra dependencies
+	container = container.WithExec([]string{
+		"pip", "install", "--no-cache-dir", "black",
+	})
+
+	args := []string{"black"}
+
+	// Add line length
+	if config.LineLength > 0 {
+		args = append(args, "--line-length", fmt.Sprintf("%d", config.LineLength))
+	}
+
+	// Add string normalization flag
+	if config.SkipStringNormalization {
+		args = append(args, "--skip-string-normalization")
+	}
+
+	// Add target versions
+	if len(config.TargetVersion) > 0 {
+		args = append(args, "--target-version", strings.Join(config.TargetVersion, ","))
+	}
+
+	// Add included patterns
+	if len(config.Include) > 0 {
+		args = append(args, "--include", strings.Join(config.Include, "|"))
+	}
+
+	// Add excluded patterns
+	if len(config.Exclude) > 0 {
+		args = append(args, "--exclude", strings.Join(config.Exclude, "|"))
+	}
+
+	// Add check flag
+	if config.Check {
+		args = append(args, "--check")
+	}
+
+	// Add diff flag
+	if config.ShowDiff {
+		args = append(args, "--diff")
+	}
+
+	// Add extra arguments
+	args = append(args, config.ExtraArgs...)
+
+	// Add target path
+	args = append(args, m.PackagePath)
+
+	return container.WithExec(args).Stdout(ctx)
+}
+
+// getDefaultDocsConfig returns default documentation configuration
+func (m *Python) getDefaultDocsConfig() *DocsConfig {
+	return &DocsConfig{
+		Enabled: true,
+		Tool: "sphinx",
+		SourceDir: "docs",
+		OutputDir: "site",
+		Format: "html",
+		Theme: "sphinx_rtd_theme",
+		ProjectName: "",
+		Version: "",
+		Author: "",
+		Extensions: []string{
+			"sphinx.ext.autodoc",
+			"sphinx.ext.napoleon",
+			"sphinx.ext.viewcode",
+			"sphinx.ext.intersphinx",
+		},
+		ExtraDependencies: []string{
+			"sphinx",
+			"sphinx-rtd-theme",
+			"myst-parser",
+		},
+		Env: []KeyValue{},
+		ExtraArgs: []string{},
+	}
+}
+
+// BuildDocs generates documentation using Sphinx or MkDocs
+func (m *Python) BuildDocs(ctx context.Context, source *dagger.Directory) (string, error) {
+	config := m.DocsConfig
+	if config == nil {
+		config = m.getDefaultDocsConfig()
+	}
+
+	if !config.Enabled {
+		return "Documentation generation skipped", nil
+	}
+
+	container := m.BuildEnv(source)
+
+	// Install documentation dependencies
+	container = container.WithExec(append(
+		[]string{"pip", "install", "--no-cache-dir"},
+		config.ExtraDependencies...,
+	))
+
+	// Add environment variables
+	for _, kv := range config.Env {
+		container = container.WithEnvVariable(kv.Key, kv.Value)
+	}
+
+	var args []string
+	switch config.Tool {
+	case "mkdocs":
+		args = []string{"mkdocs", "build"}
+		if config.OutputDir != "" {
+			args = append(args, "--site-dir", config.OutputDir)
+		}
+	default: // sphinx
+		args = []string{
+			"sphinx-build",
+			"-b", config.Format,
+			config.SourceDir,
+			filepath.Join(config.OutputDir, config.Format),
+		}
+		if config.ProjectName != "" {
+			args = append(args, "-D", fmt.Sprintf("project=%s", config.ProjectName))
+		}
+		if config.Version != "" {
+			args = append(args, "-D", fmt.Sprintf("version=%s", config.Version))
+		}
+		if config.Author != "" {
+			args = append(args, "-D", fmt.Sprintf("author=%s", config.Author))
+		}
+		if config.Theme != "" {
+			args = append(args, "-D", fmt.Sprintf("html_theme=%s", config.Theme))
+		}
+	}
+
+	// Add extra arguments
+	args = append(args, config.ExtraArgs...)
+
+	return container.WithExec(args).Stdout(ctx)
 }
