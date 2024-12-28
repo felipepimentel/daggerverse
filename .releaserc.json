@@ -17,21 +17,21 @@
     [
       "@semantic-release/changelog",
       {
-        "changelogFile": "${process.env.MODULE_PATH}/CHANGELOG.md"
+        "changelogFile": "CHANGELOG.md"
       }
     ],
     [
       "@semantic-release/git",
       {
-        "assets": ["${process.env.MODULE_PATH}/CHANGELOG.md"],
-        "message": "chore(${process.env.MODULE_NAME}): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        "assets": ["CHANGELOG.md"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "git tag -a ${process.env.MODULE_NAME}/v${nextRelease.version} -m \"Release ${process.env.MODULE_NAME}/v${nextRelease.version}\"",
-        "publishCmd": "git push origin ${process.env.MODULE_NAME}/v${nextRelease.version}"
+        "prepareCmd": "cd ${process.env.MODULE_PATH} && git tag -a v${nextRelease.version} -m \"Release v${nextRelease.version}\"",
+        "publishCmd": "git push origin v${nextRelease.version}"
       }
     ]
   ]
