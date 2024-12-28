@@ -1,3 +1,11 @@
+# [1.6.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.5.0...python/v1.6.0) (2024-12-28)
+
+
+### Features
+
+* **python:** add CI/CD pipeline documentation and usage examples ([4662d03](https://github.com/felipepimentel/daggerverse/commit/4662d037840aa71aed07050966043649d305b911))
+* **python:** implement CI/CD pipeline functions for testing, building, and publishing ([249a45e](https://github.com/felipepimentel/daggerverse/commit/249a45ebce9053052c7f57e7531aa87313b2d846))
+
 # [1.5.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.4.0...python/v1.5.0) (2024-12-28)
 
 
