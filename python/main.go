@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"dagger/python/internal/dagger"
+
+	"github.com/spf13/viper"
 )
 
 // KeyValue represents a key-value pair
@@ -361,6 +364,39 @@ func (m *Python) validatePyPIConfig(config *PyPIConfig) error {
 	return nil
 }
 
+// getEnvOrSecret tries to get a value from multiple sources in order:
+// 1. Command line argument
+// 2. Environment variable
+// 3. .env file
+// 4. Default value
+func (m *Python) getEnvOrSecret(key string, defaultValue string) (*dagger.Secret, error) {
+	// Initialize viper
+	v := viper.New()
+	
+	// Set up viper to read from environment
+	v.SetEnvPrefix("")
+	v.AutomaticEnv()
+	
+	// Try to read from .env file if it exists
+	v.SetConfigFile(".env")
+	_ = v.ReadInConfig() // Ignore error if file doesn't exist
+	
+	// Get value from any source
+	value := v.GetString(key)
+	if value == "" {
+		value = os.Getenv(key)
+	}
+	if value == "" {
+		value = defaultValue
+	}
+	
+	if value == "" {
+		return nil, fmt.Errorf("%s is required", key)
+	}
+	
+	return dag.SetSecret(key, value), nil
+}
+
 // Publish builds, tests and publishes the Python package to a registry
 func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
 	config := m.PyPIConfig
@@ -399,21 +435,21 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		config.Registry,
 	})
 
-	// Use provided token or fallback to PyPIConfig token
+	// Get token from provided token, environment, or config
 	publishToken := token
 	if publishToken == nil {
-		publishToken = config.Token
+		var err error
+		publishToken, err = m.getEnvOrSecret("PYPI_TOKEN", "")
+		if err != nil {
+			return "", err
+		}
 	}
 
-	// Add authentication if token is provided
-	if publishToken != nil {
-		container = container.WithSecretVariable(
-			fmt.Sprintf("POETRY_PYPI_TOKEN_%s", strings.ToUpper(config.RepositoryName)),
-			publishToken,
-		)
-	} else {
-		return "", fmt.Errorf("PyPI token is required for publishing. Use --token flag or configure PyPIConfig")
-	}
+	// Add authentication
+	container = container.WithSecretVariable(
+		"POETRY_PYPI_TOKEN_PYPI",
+		publishToken,
+	)
 
 	// Prepare publish command
 	publishCmd := []string{

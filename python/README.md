@@ -166,10 +166,24 @@ await mod.cicd(
 
 ### Using with GitHub Actions
 
-```yaml
-name: CI
+First, configure your PyPI token as a repository secret:
 
-on: [push, pull_request]
+1. Go to your repository settings
+2. Navigate to "Secrets and variables" > "Actions"
+3. Click "New repository secret"
+4. Name: `PYPI_TOKEN`
+5. Value: Your PyPI token
+
+Then use it in your workflow:
+
+```yaml
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
@@ -180,7 +194,27 @@ jobs:
       - name: Install Dagger
         run: pip install dagger-io
 
-      - name: Test and Build
+      - name: Run CI (Pull Request)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 << 'EOF'
+          import dagger
+          import asyncio
+
+          async def pipeline():
+              async with dagger.Connection() as client:
+                  mod = await client.host().module("github.com/felipepimentel/daggerverse/python")
+                  source = client.host().directory(".")
+                  
+                  # Run CI pipeline (test + build)
+                  print("Running CI pipeline...")
+                  await mod.ci(source)
+
+          asyncio.run(pipeline())
+          EOF
+
+      - name: Run CI/CD (Main Branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           python3 << 'EOF'
           import dagger
@@ -191,25 +225,24 @@ jobs:
               async with dagger.Connection() as client:
                   mod = await client.host().module("github.com/felipepimentel/daggerverse/python")
                   source = client.host().directory(".")
+                  token = client.set_secret("PYPI_TOKEN", os.getenv("PYPI_TOKEN"))
                   
-                  # Run tests
-                  print("Running tests...")
-                  await mod.test(source)
-                  
-                  # Build package
-                  print("Building package...")
-                  await mod.build(source)
-                  
-                  if os.getenv("PYPI_TOKEN"):
-                      print("Publishing to PyPI...")
-                      token = client.set_secret("PYPI_TOKEN", os.getenv("PYPI_TOKEN"))
-                      await mod.publish(source, token)
+                  # Run complete CI/CD pipeline
+                  print("Running CI/CD pipeline...")
+                  await mod.cicd(source, token)
 
           asyncio.run(pipeline())
           EOF
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 ```
+
+This workflow:
+
+- Runs only CI (test + build) for pull requests
+- Runs complete CI/CD (test + build + publish) for pushes to main
+- Automatically uses the `PYPI_TOKEN` secret configured in the repository
+- Keeps the token secure by using GitHub's secret management
 
 ### Command Line Usage
 
@@ -316,3 +349,35 @@ async with dagger.Connection() as client:
 - Enable caching for faster builds in CI
 - Set appropriate coverage thresholds for your project
 - Use Test PyPI for testing package publishing
+
+### PyPI Token Configuration
+
+The module supports multiple ways to provide the PyPI token, in order of precedence:
+
+1. Direct token parameter in function calls:
+
+```python
+token = client.set_secret("PYPI_TOKEN", "your-token-here")
+await mod.publish(source, token)
+```
+
+2. Environment variable:
+
+```bash
+export PYPI_TOKEN=your-token-here
+await mod.publish(source)
+```
+
+3. `.env` file in your project root:
+
+```env
+PYPI_TOKEN=your-token-here
+```
+
+4. Command line argument when using `dagger call`:
+
+```bash
+dagger call -m github.com/felipepimentel/daggerverse/python publish \
+  --source . \
+  --token your-token-here
+```
