@@ -90,6 +90,80 @@ await mod.publish(
 )
 ```
 
+#### `ci(source: Directory) -> str`
+
+Run the Continuous Integration pipeline (test and build).
+
+```python
+# Basic usage
+await mod.ci(source)
+
+# With custom configuration
+await mod.ci(
+    source,
+    test_config={
+        "verbosity": 2,
+        "parallel_workers": 4,
+        "enable_coverage": True,
+        "coverage_threshold": 90
+    },
+    build_config={
+        "python_version": "3.11",
+        "cache_dependencies": True
+    }
+)
+```
+
+#### `cd(source: Directory, token: Secret) -> str`
+
+Run the Continuous Delivery pipeline (publish to PyPI).
+
+```python
+# Basic usage
+token = client.set_secret("PYPI_TOKEN", os.getenv("PYPI_TOKEN"))
+await mod.cd(source, token)
+
+# With custom configuration
+await mod.cd(
+    source,
+    token,
+    publish_config={
+        "repository": "https://test.pypi.org/legacy/",
+        "skip_existing": True
+    }
+)
+```
+
+#### `cicd(source: Directory, token: Secret) -> str`
+
+Run the complete CI/CD pipeline (test, build, and publish).
+
+```python
+# Basic usage
+token = client.set_secret("PYPI_TOKEN", os.getenv("PYPI_TOKEN"))
+await mod.cicd(source, token)
+
+# With custom configuration
+await mod.cicd(
+    source,
+    token,
+    test_config={
+        "verbosity": 2,
+        "parallel_workers": 4,
+        "enable_coverage": True,
+        "coverage_threshold": 90
+    },
+    build_config={
+        "python_version": "3.11",
+        "cache_dependencies": True
+    },
+    publish_config={
+        "repository": "https://test.pypi.org/legacy/",
+        "skip_existing": True
+    }
+)
+```
+
 ### Using with GitHub Actions
 
 ```yaml
@@ -148,8 +222,16 @@ dagger call -m github.com/felipepimentel/daggerverse/python test --source .
 # Build package
 dagger call -m github.com/felipepimentel/daggerverse/python build --source .
 
-# Publish to PyPI
-dagger call -m github.com/felipepimentel/daggerverse/python publish \
+# Run CI pipeline (test + build)
+dagger call -m github.com/felipepimentel/daggerverse/python ci --source .
+
+# Run CD pipeline (publish)
+dagger call -m github.com/felipepimentel/daggerverse/python cd \
+  --source . \
+  --token $PYPI_TOKEN
+
+# Run complete CI/CD pipeline (test + build + publish)
+dagger call -m github.com/felipepimentel/daggerverse/python cicd \
   --source . \
   --token $PYPI_TOKEN
 ```
@@ -176,6 +258,15 @@ dagger call -m github.com/felipepimentel/daggerverse/python publish \
 - `repository`: PyPI repository URL (default: "pypi")
 - `skip_existing`: Skip if version exists (default: false)
 - `verify_ssl`: Verify SSL certificates (default: true)
+
+### CI Configuration
+
+- `test_config`: Configuration for test step (see Test Configuration)
+- `build_config`: Configuration for build step (see Build Configuration)
+- `publish_config`: Configuration for publish step (see Publish Configuration)
+- `skip_test`: Skip test step (default: false)
+- `skip_build`: Skip build step (default: false)
+- `skip_publish`: Skip publish step if token is provided (default: false)
 
 ## Examples
 
