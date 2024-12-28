@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"dagger/python/internal/dagger"
 )
@@ -18,6 +19,67 @@ type PyPIConfig struct {
 	SkipExisting bool
 	// Allow dirty versions (default: false)
 	AllowDirty bool
+	// Additional publish arguments
+	ExtraArgs []string
+	// Environment variables for publishing
+	Env map[string]string
+	// Repository name in Poetry config (default: "pypi")
+	RepositoryName string
+	// Skip build before publishing (default: false)
+	SkipBuild bool
+	// Skip verification before publishing (default: false)
+	SkipVerify bool
+}
+
+// TestConfig holds pytest configuration options
+type TestConfig struct {
+	// Verbose output (default: true)
+	Verbose bool
+	// Number of parallel workers (default: auto)
+	Workers int
+	// Coverage configuration
+	Coverage *CoverageConfig
+	// Additional pytest arguments
+	ExtraArgs []string
+	// Environment variables for tests
+	Env map[string]string
+}
+
+// CoverageConfig holds coverage reporting configuration
+type CoverageConfig struct {
+	// Enable coverage reporting (default: true)
+	Enabled bool
+	// Coverage report formats (default: ["term", "xml"])
+	Formats []string
+	// Minimum coverage percentage (default: 0)
+	MinCoverage float64
+	// Coverage output directory (default: "coverage")
+	OutputDir string
+}
+
+// BuildConfig holds Poetry build configuration
+type BuildConfig struct {
+	// Additional build arguments
+	BuildArgs []string
+	// Additional dependencies to install
+	ExtraDependencies []string
+	// Poetry configuration options
+	PoetryConfig map[string]string
+	// Environment variables for build
+	Env map[string]string
+	// Cache configuration
+	Cache *CacheConfig
+}
+
+// CacheConfig holds cache configuration
+type CacheConfig struct {
+	// Enable pip cache (default: true)
+	PipCache bool
+	// Enable poetry cache (default: true)
+	PoetryCache bool
+	// Custom cache volume names
+	PipCacheVolume string
+	PoetryCacheVolume string
 }
 
 // Python represents a Python module with Poetry support
@@ -28,6 +90,10 @@ type Python struct {
 	PackagePath string
 	// PyPIConfig holds the PyPI deployment configuration
 	PyPIConfig *PyPIConfig
+	// TestConfig holds the test configuration
+	TestConfig *TestConfig
+	// BuildConfig holds the build configuration
+	BuildConfig *BuildConfig
 }
 
 // WithPythonVersion sets the Python version to use
@@ -45,6 +111,18 @@ func (m *Python) WithPackagePath(path string) *Python {
 // WithPyPIConfig sets the PyPI deployment configuration
 func (m *Python) WithPyPIConfig(config *PyPIConfig) *Python {
 	m.PyPIConfig = config
+	return m
+}
+
+// WithTestConfig sets the test configuration
+func (m *Python) WithTestConfig(config *TestConfig) *Python {
+	m.TestConfig = config
+	return m
+}
+
+// WithBuildConfig sets the build configuration
+func (m *Python) WithBuildConfig(config *BuildConfig) *Python {
+	m.BuildConfig = config
 	return m
 }
 
@@ -73,48 +151,92 @@ func (m *Python) getPyPIRegistry() string {
 	return m.PyPIConfig.Registry
 }
 
+// getDefaultPyPIConfig returns default PyPI configuration
+func (m *Python) getDefaultPyPIConfig() *PyPIConfig {
+	return &PyPIConfig{
+		Registry: "https://upload.pypi.org/legacy/",
+		SkipExisting: false,
+		AllowDirty: false,
+		ExtraArgs: []string{},
+		Env: make(map[string]string),
+		RepositoryName: "pypi",
+		SkipBuild: false,
+		SkipVerify: false,
+	}
+}
+
 // Publish builds, tests and publishes the Python package to a registry
 func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	// Run tests before publishing
-	if _, err := m.Test(ctx, source); err != nil {
-		return "", fmt.Errorf("tests failed: %w", err)
+	config := m.PyPIConfig
+	if config == nil {
+		config = m.getDefaultPyPIConfig()
 	}
 
-	// Build the package
-	container := m.Build(source)
+	// Run tests before publishing unless verification is skipped
+	if !config.SkipVerify {
+		if _, err := m.Test(ctx, source); err != nil {
+			return "", fmt.Errorf("tests failed: %w", err)
+		}
+	}
+
+	// Build the package unless skipped
+	var container *dagger.Container
+	if !config.SkipBuild {
+		container = m.Build(source)
+	} else {
+		container = m.BuildEnv(source)
+	}
+
+	// Add environment variables
+	for key, value := range config.Env {
+		container = container.WithEnvVariable(key, value)
+	}
 
 	// Configure Poetry for publishing
 	container = container.WithExec([]string{
 		"poetry", "config",
-		"repositories.pypi.url", m.getPyPIRegistry(),
+		fmt.Sprintf("repositories.%s.url", config.RepositoryName),
+		config.Registry,
 	})
 
 	// Use provided token or fallback to PyPIConfig token
 	publishToken := token
-	if publishToken == nil && m.PyPIConfig != nil {
-		publishToken = m.PyPIConfig.Token
+	if publishToken == nil {
+		publishToken = config.Token
 	}
 
 	// Add authentication if token is provided
 	if publishToken != nil {
-		container = container.
-			WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", publishToken)
+		container = container.WithSecretVariable(
+			fmt.Sprintf("POETRY_PYPI_TOKEN_%s", strings.ToUpper(config.RepositoryName)),
+			publishToken,
+		)
 	} else {
 		return "", fmt.Errorf("PyPI token is required for publishing. Use --token flag or configure PyPIConfig")
 	}
 
 	// Prepare publish command
-	publishCmd := []string{"poetry", "publish", "--build", "--no-interaction"}
-	
-	// Add optional flags based on configuration
-	if m.PyPIConfig != nil {
-		if m.PyPIConfig.SkipExisting {
-			publishCmd = append(publishCmd, "--skip-existing")
-		}
-		if m.PyPIConfig.AllowDirty {
-			publishCmd = append(publishCmd, "--allow-dirty")
-		}
+	publishCmd := []string{
+		"poetry", "publish",
+		"--repository", config.RepositoryName,
+		"--no-interaction",
 	}
+
+	// Add build flag if not skipping build
+	if !config.SkipBuild {
+		publishCmd = append(publishCmd, "--build")
+	}
+
+	// Add optional flags
+	if config.SkipExisting {
+		publishCmd = append(publishCmd, "--skip-existing")
+	}
+	if config.AllowDirty {
+		publishCmd = append(publishCmd, "--allow-dirty")
+	}
+
+	// Add any extra arguments
+	publishCmd = append(publishCmd, config.ExtraArgs...)
 
 	// Execute publish command
 	return container.WithExec(publishCmd).Stdout(ctx)
@@ -131,50 +253,154 @@ func (m *Python) Build(source *dagger.Directory) *dagger.Container {
 	return container.WithDirectory("/dist", container.Directory("/app/dist"))
 }
 
+// getDefaultTestConfig returns default test configuration
+func (m *Python) getDefaultTestConfig() *TestConfig {
+	return &TestConfig{
+		Verbose: true,
+		Workers: 0, // auto
+		Coverage: &CoverageConfig{
+			Enabled: true,
+			Formats: []string{"term", "xml"},
+			MinCoverage: 0,
+			OutputDir: "coverage",
+		},
+		Env: make(map[string]string),
+	}
+}
+
 // Test runs the test suite using pytest with coverage reporting
 func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, error) {
-	return m.BuildEnv(source).
-		WithExec([]string{
-			"poetry", "run", "pytest",
-			"--verbose",
-			"--color=yes",
-			fmt.Sprintf("--cov=%s", m.PackagePath),
-			"--cov-report=xml",
-			"--cov-report=term",
-			"--cov-report=html:coverage_html",
-			"--no-cov-on-fail",
-		}).
-		Stdout(ctx)
+	config := m.TestConfig
+	if config == nil {
+		config = m.getDefaultTestConfig()
+	}
+
+	container := m.BuildEnv(source)
+
+	// Add environment variables
+	for key, value := range config.Env {
+		container = container.WithEnvVariable(key, value)
+	}
+
+	args := []string{"poetry", "run", "pytest"}
+
+	if config.Verbose {
+		args = append(args, "--verbose", "--color=yes")
+	}
+
+	if config.Workers > 0 {
+		args = append(args, fmt.Sprintf("-n=%d", config.Workers))
+	}
+
+	if config.Coverage != nil && config.Coverage.Enabled {
+		args = append(args, fmt.Sprintf("--cov=%s", m.PackagePath))
+		
+		for _, format := range config.Coverage.Formats {
+			switch format {
+			case "xml":
+				args = append(args, "--cov-report=xml")
+			case "html":
+				args = append(args, fmt.Sprintf("--cov-report=html:%s/html", config.Coverage.OutputDir))
+			case "term":
+				args = append(args, "--cov-report=term")
+			}
+		}
+
+		if config.Coverage.MinCoverage > 0 {
+			args = append(args, fmt.Sprintf("--cov-fail-under=%f", config.Coverage.MinCoverage))
+		}
+
+		args = append(args, "--no-cov-on-fail")
+	}
+
+	// Add any extra arguments
+	args = append(args, config.ExtraArgs...)
+
+	return container.WithExec(args).Stdout(ctx)
+}
+
+// getDefaultBuildConfig returns default build configuration
+func (m *Python) getDefaultBuildConfig() *BuildConfig {
+	return &BuildConfig{
+		BuildArgs: []string{},
+		ExtraDependencies: []string{},
+		PoetryConfig: map[string]string{
+			"virtualenvs.in-project": "true",
+		},
+		Env: make(map[string]string),
+		Cache: &CacheConfig{
+			PipCache: true,
+			PoetryCache: true,
+			PipCacheVolume: "pip-cache",
+			PoetryCacheVolume: "poetry-cache",
+		},
+	}
 }
 
 // BuildEnv prepares a Python development environment with Poetry
 func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
-	poetryCache := dag.CacheVolume("poetry-cache")
-	pipCache := dag.CacheVolume("pip-cache")
-	
-	workdir := m.getWorkdir("/app")
-	
-	return dag.Container().
-		From(m.getBaseImage()).
+	config := m.BuildConfig
+	if config == nil {
+		config = m.getDefaultBuildConfig()
+	}
+
+	container := dag.Container().From(m.getBaseImage())
+
+	// Add environment variables
+	for key, value := range config.Env {
+		container = container.WithEnvVariable(key, value)
+	}
+
+	// Setup caches
+	if config.Cache != nil {
+		if config.Cache.PipCache {
+			pipCache := dag.CacheVolume(config.Cache.PipCacheVolume)
+			container = container.WithMountedCache("/root/.cache/pip", pipCache)
+		}
+		if config.Cache.PoetryCache {
+			poetryCache := dag.CacheVolume(config.Cache.PoetryCacheVolume)
+			container = container.WithMountedCache("/root/.cache/pypoetry", poetryCache)
+		}
+	}
+
+	// Add source code
+	container = container.
 		WithDirectory("/app", source).
-		WithMountedCache("/root/.cache/pypoetry", poetryCache).
-		WithMountedCache("/root/.cache/pip", pipCache).
-		WithWorkdir(workdir).
-		WithExec([]string{
-			"pip", "install",
-			"--no-cache-dir",
-			"--upgrade",
-			"pip",
-			"poetry",
-		}).
-		WithExec([]string{
+		WithWorkdir(m.getWorkdir("/app"))
+
+	// Install base dependencies
+	container = container.WithExec([]string{
+		"pip", "install",
+		"--no-cache-dir",
+		"--upgrade",
+		"pip",
+		"poetry",
+	})
+
+	// Install extra dependencies if any
+	if len(config.ExtraDependencies) > 0 {
+		container = container.WithExec(append(
+			[]string{"pip", "install", "--no-cache-dir"},
+			config.ExtraDependencies...,
+		))
+	}
+
+	// Configure Poetry
+	for key, value := range config.PoetryConfig {
+		container = container.WithExec([]string{
 			"poetry", "config",
-			"virtualenvs.in-project", "true",
-		}).
-		WithExec([]string{
-			"poetry", "install",
-			"--no-interaction",
-			"--no-root",
-			"--with", "dev",
+			key, value,
 		})
+	}
+
+	// Install project dependencies
+	installArgs := []string{
+		"poetry", "install",
+		"--no-interaction",
+		"--no-root",
+		"--with", "dev",
+	}
+	installArgs = append(installArgs, config.BuildArgs...)
+	
+	return container.WithExec(installArgs)
 }
