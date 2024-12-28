@@ -1,6 +1,6 @@
 {
   "branches": ["main"],
-  "tagFormat": "${env.MODULE_NAME}/v${version}",
+  "tagFormat": "${process.env.MODULE_NAME}/v${version}",
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
@@ -22,20 +22,20 @@
     [
       "@semantic-release/changelog",
       {
-        "changelogFile": "${env.MODULE_PATH}/CHANGELOG.md"
+        "changelogFile": "${process.env.MODULE_PATH}/CHANGELOG.md"
       }
     ],
     [
       "@semantic-release/git",
       {
-        "assets": ["${env.MODULE_PATH}/CHANGELOG.md"],
-        "message": "chore(${env.MODULE_NAME}): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        "assets": ["${process.env.MODULE_PATH}/CHANGELOG.md"],
+        "message": "chore(${process.env.MODULE_NAME}): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "cd ${env.MODULE_PATH} && git tag -a v${nextRelease.version} -m \"${env.MODULE_NAME} v${nextRelease.version}\""
+        "prepareCmd": "cd ${process.env.MODULE_PATH} && git tag -a v${nextRelease.version} -m \"${process.env.MODULE_NAME} v${nextRelease.version}\""
       }
     ],
     [
