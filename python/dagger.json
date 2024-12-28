@@ -1,9 +1,6 @@
 {
   "name": "python",
-  "sdk": "go",
   "engineVersion": "v0.15.1",
-  "description": "A comprehensive Python module for Dagger that streamlines Poetry-based Python development workflows. Features include automated package building with proper dependency management, configurable test execution with coverage reporting, and secure PyPI publishing with registry selection. Perfect for teams looking to automate their Python package development pipeline with best practices.",
-  "source": ".",
-  "repository": "github.com/daggerverse/python",
-  "license": "Apache-2.0"
+  "sdk": "go",
+  "source": "."
 }
