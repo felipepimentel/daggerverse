@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.3.0...python/v1.4.0) (2024-12-28)
+
+
+### Features
+
+* **python:** add linting, formatting and documentation support ([23ecc55](https://github.com/felipepimentel/daggerverse/commit/23ecc55e4c525f3dfcab38c1fed7dbf0c9ae5dc1))
+
 # [1.3.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.2...python/v1.3.0) (2024-12-28)
 
 
