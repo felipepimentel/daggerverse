@@ -261,12 +261,12 @@ dagger call -m github.com/felipepimentel/daggerverse/python ci --source .
 # Run CD pipeline (publish)
 dagger call -m github.com/felipepimentel/daggerverse/python cd \
   --source . \
-  --token $PYPI_TOKEN
+  --token env:PYPI_TOKEN
 
 # Run complete CI/CD pipeline (test + build + publish)
 dagger call -m github.com/felipepimentel/daggerverse/python cicd \
   --source . \
-  --token $PYPI_TOKEN
+  --token env:PYPI_TOKEN
 ```
 
 ## Configuration Options
