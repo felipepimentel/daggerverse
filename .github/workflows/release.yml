@@ -1,4 +1,5 @@
 name: Release
+
 on:
   push:
     branches:
@@ -15,7 +16,8 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -52,22 +54,26 @@ jobs:
 
       - name: Get changed files in module
         id: changed-files
-        uses: tj-actions/changed-files@v45
-        with:
-          files: ${{ matrix.module }}/**
+        run: |
+          # Check if any files in the module path were modified
+          git diff --name-only HEAD^ HEAD | grep "^${{ matrix.module }}/" || true
+          echo "any_changed=true" >> $GITHUB_OUTPUT
+
+      - name: Set environment variables
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "MODULE_PATH=${{ matrix.module }}" >> $GITHUB_ENV
+          echo "MODULE_NAME=${{ matrix.module }}" >> $GITHUB_ENV
 
       - name: Create Release
         if: steps.changed-files.outputs.any_changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MODULE_PATH: ${{ matrix.module }}
-          MODULE_NAME: ${{ matrix.module }}
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           npx semantic-release
 
-      # Publicar no Daggerverse logo após o release
       - name: Setup Dagger
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: dagger/dagger-for-github@v6
