@@ -435,22 +435,12 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		container = container.WithEnvVariable(kv.Key, kv.Value)
 	}
 
-	// Create .pypirc file for authentication
+	// Configure Poetry authentication
 	if token != nil {
-		pypirc := fmt.Sprintf(`[distutils]
-index-servers =
-    pypi
-
-[pypi]
-repository = %s
-username = __token__
-`, config.Registry)
-		
-		container = container.WithNewFile(
-			"/root/.pypirc",
-			pypirc,
-			dagger.ContainerWithNewFileOpts{Permissions: 0600},
-		).WithSecretVariable("POETRY_PYPI_TOKEN", token)
+		container = container.
+			WithSecretVariable("POETRY_HTTP_BASIC_PYPI_USERNAME", dag.SetSecret("PYPI_USERNAME", "__token__")).
+			WithSecretVariable("POETRY_HTTP_BASIC_PYPI_PASSWORD", token).
+			WithSecretVariable("POETRY_PYPI_TOKEN", token)
 	}
 
 	// Build publish command
