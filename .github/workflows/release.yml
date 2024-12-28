@@ -23,7 +23,6 @@ jobs:
 
       - id: set-matrix
         run: |
-          # Identifica os módulos que possuem o arquivo dagger.json
           MODULES=$(find . -name "dagger.json" -exec dirname {} \; | sed 's|^./||' | jq -R -s -c 'split("\n")[:-1]')
           echo "matrix=${MODULES}" >> $GITHUB_OUTPUT
 
@@ -49,7 +48,7 @@ jobs:
           node-version: "lts/*"
 
       - name: Install dependencies
-        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec @semantic-release/github
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
 
       - name: Configure Git
         run: |
@@ -64,7 +63,7 @@ jobs:
         run: npx semantic-release
 
       - name: Setup Dagger
-        uses: dagger/dagger-for-github@v7
+        uses: dagger/dagger-for-github@v6
         with:
           version: "latest"
           workdir: ${{ matrix.module }}
