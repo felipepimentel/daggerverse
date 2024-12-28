@@ -22,13 +22,13 @@ module.exports = {
     [
       "@semantic-release/changelog",
       {
-        changelogFile: `${process.env.MODULE_PATH}/CHANGELOG.md`,
+        changelogFile: "${process.env.MODULE_PATH}/CHANGELOG.md",
       },
     ],
     [
       "@semantic-release/git",
       {
-        assets: [`${process.env.MODULE_PATH}/CHANGELOG.md`],
+        assets: ["${process.env.MODULE_PATH}/CHANGELOG.md"],
         message: `chore(${process.env.MODULE_NAME}): release \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}`,
       },
     ],
