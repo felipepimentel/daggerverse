@@ -9,6 +9,12 @@ import (
 	"dagger/python/internal/dagger"
 )
 
+// KeyValue represents a key-value pair
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
 // PyPIConfig holds PyPI deployment configuration
 type PyPIConfig struct {
 	// Registry URL (default: https://upload.pypi.org/legacy/)
@@ -22,7 +28,7 @@ type PyPIConfig struct {
 	// Additional publish arguments
 	ExtraArgs []string
 	// Environment variables for publishing
-	Env map[string]string
+	Env []KeyValue
 	// Repository name in Poetry config (default: "pypi")
 	RepositoryName string
 	// Skip build before publishing (default: false)
@@ -42,7 +48,7 @@ type TestConfig struct {
 	// Additional pytest arguments
 	ExtraArgs []string
 	// Environment variables for tests
-	Env map[string]string
+	Env []KeyValue
 }
 
 // CoverageConfig holds coverage reporting configuration
@@ -64,9 +70,9 @@ type BuildConfig struct {
 	// Additional dependencies to install
 	ExtraDependencies []string
 	// Poetry configuration options
-	PoetryConfig map[string]string
+	PoetryConfig []KeyValue
 	// Environment variables for build
-	Env map[string]string
+	Env []KeyValue
 	// Cache configuration
 	Cache *CacheConfig
 }
@@ -154,14 +160,14 @@ func (m *Python) getPyPIRegistry() string {
 // getDefaultPyPIConfig returns default PyPI configuration
 func (m *Python) getDefaultPyPIConfig() *PyPIConfig {
 	return &PyPIConfig{
-		Registry: "https://upload.pypi.org/legacy/",
-		SkipExisting: false,
-		AllowDirty: false,
-		ExtraArgs: []string{},
-		Env: make(map[string]string),
+		Registry:       "https://upload.pypi.org/legacy/",
+		SkipExisting:  false,
+		AllowDirty:    false,
+		ExtraArgs:     []string{},
+		Env:           []KeyValue{},
 		RepositoryName: "pypi",
-		SkipBuild: false,
-		SkipVerify: false,
+		SkipBuild:     false,
+		SkipVerify:    false,
 	}
 }
 
@@ -188,8 +194,8 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	}
 
 	// Add environment variables
-	for key, value := range config.Env {
-		container = container.WithEnvVariable(key, value)
+	for _, kv := range config.Env {
+		container = container.WithEnvVariable(kv.Key, kv.Value)
 	}
 
 	// Configure Poetry for publishing
@@ -264,7 +270,7 @@ func (m *Python) getDefaultTestConfig() *TestConfig {
 			MinCoverage: 0,
 			OutputDir: "coverage",
 		},
-		Env: make(map[string]string),
+		Env: []KeyValue{},
 	}
 }
 
@@ -278,8 +284,8 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 	container := m.BuildEnv(source)
 
 	// Add environment variables
-	for key, value := range config.Env {
-		container = container.WithEnvVariable(key, value)
+	for _, kv := range config.Env {
+		container = container.WithEnvVariable(kv.Key, kv.Value)
 	}
 
 	args := []string{"poetry", "run", "pytest"}
@@ -324,10 +330,8 @@ func (m *Python) getDefaultBuildConfig() *BuildConfig {
 	return &BuildConfig{
 		BuildArgs: []string{},
 		ExtraDependencies: []string{},
-		PoetryConfig: map[string]string{
-			"virtualenvs.in-project": "true",
-		},
-		Env: make(map[string]string),
+		PoetryConfig: []KeyValue{},
+		Env: []KeyValue{},
 		Cache: &CacheConfig{
 			PipCache: true,
 			PoetryCache: true,
@@ -347,8 +351,8 @@ func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 	container := dag.Container().From(m.getBaseImage())
 
 	// Add environment variables
-	for key, value := range config.Env {
-		container = container.WithEnvVariable(key, value)
+	for _, kv := range config.Env {
+		container = container.WithEnvVariable(kv.Key, kv.Value)
 	}
 
 	// Setup caches
@@ -386,10 +390,10 @@ func (m *Python) BuildEnv(source *dagger.Directory) *dagger.Container {
 	}
 
 	// Configure Poetry
-	for key, value := range config.PoetryConfig {
+	for _, kv := range config.PoetryConfig {
 		container = container.WithExec([]string{
 			"poetry", "config",
-			key, value,
+			kv.Key, kv.Value,
 		})
 	}
 
