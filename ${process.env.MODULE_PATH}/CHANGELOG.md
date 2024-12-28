@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.2...python/v1.3.0) (2024-12-28)
+
+
+### Features
+
+* **python:** enhance module flexibility and configuration ([0ac7d3a](https://github.com/felipepimentel/daggerverse/commit/0ac7d3affdfd76df13531e0a009f3554994bfec0))
+
 ## [1.2.2](https://github.com/felipepimentel/daggerverse/compare/python/v1.2.1...python/v1.2.2) (2024-12-28)
 
 
