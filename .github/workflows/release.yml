@@ -40,6 +40,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,7 +48,7 @@ jobs:
           node-version: "lts/*"
 
       - name: Install dependencies
-        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec @semantic-release/github
 
       - name: Get changed files in module
         id: changed-files
@@ -61,7 +62,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODULE_PATH: ${{ matrix.module }}
           MODULE_NAME: ${{ matrix.module }}
-        run: npx semantic-release
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          npx semantic-release
 
       # Publicar no Daggerverse logo após o release
       - name: Setup Dagger
@@ -71,7 +75,14 @@ jobs:
           version: "latest"
           workdir: ${{ matrix.module }}
 
-      - name: Publish to Daggerverse
+      - name: Get latest tag
         if: steps.changed-files.outputs.any_changed == 'true'
+        id: get-tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 --match "${{ matrix.module }}/v*" || echo "")
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Publish to Daggerverse
+        if: steps.changed-files.outputs.any_changed == 'true' && steps.get-tag.outputs.tag != ''
         working-directory: ${{ matrix.module }}
         run: dagger publish
