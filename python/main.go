@@ -1220,19 +1220,11 @@ func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagg
 }
 
 func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
-	// Get GitHub token from environment
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	if githubToken == "" {
-		return "", fmt.Errorf("GITHUB_TOKEN environment variable is required")
-	}
-
 	// Setup container with Node.js and required tools
 	container := dag.Container().
 		From("node:lts-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
-		WithEnvVariable("GITHUB_TOKEN", githubToken).
-		WithEnvVariable("GH_TOKEN", githubToken). // semantic-release também verifica esta variável
 		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
 		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
 		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
@@ -1250,11 +1242,6 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		"@semantic-release/changelog",
 		"@semantic-release/git",
 		"@semantic-release/github",
-	})
-
-	// Configure Git with token-based authentication
-	container = container.WithExec([]string{
-		"git", "config", "--global", "url.https://x-access-token:" + githubToken + "@github.com/.insteadOf", "https://github.com/",
 	})
 
 	// Configure Git user

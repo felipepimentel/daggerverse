@@ -7,26 +7,27 @@ on:
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
+  packages: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Dagger
-        uses: dagger/dagger-for-github@v7
+      - uses: dagger/dagger-for-github@v5
         with:
-          version: "latest"
-
-      - name: Run Release Process
+          version: "0.9.3"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release
         run: |
-          cd .dagger/release
-          go run release.go
+          dagger -m github.com/felipepimentel/daggerverse/python call cicd \
+            --source . \
+            --token env:PYPI_TOKEN
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
