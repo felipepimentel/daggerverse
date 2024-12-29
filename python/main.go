@@ -1170,12 +1170,38 @@ func (m *Python) CD(ctx context.Context, source *dagger.Directory, token *dagger
 	return m.Publish(ctx, source, publishToken)
 }
 
-// CICD runs the complete CI/CD pipeline (test, build, and publish)
-func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret, version string) (string, error) {
-	// Run CI first
-	if _, err := m.CI(ctx, source); err != nil {
-		return "", err
+// CICD runs the complete CI/CD pipeline including version management
+func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+	// First, handle versioning
+	version, err := m.bumpVersion(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("error bumping version: %v", err)
 	}
+
+	// Run tests
+	testOutput, err := m.Test(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("error running tests: %v", err)
+	}
+	fmt.Println("Tests output:", testOutput)
+
+	// Run linting
+	lintOutput, err := m.Lint(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("error running linter: %v", err)
+	}
+	fmt.Println("Lint output:", lintOutput)
+
+	// Run formatting
+	formatOutput, err := m.Format(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("error running formatter: %v", err)
+	}
+	fmt.Println("Format output:", formatOutput)
+
+	// Build package
+	buildOutput := m.Build(source)
+	fmt.Println("Build output:", buildOutput)
 
 	// Update version in pyproject.toml
 	container := m.BuildEnv(source)
@@ -1183,8 +1209,53 @@ func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagg
 		"poetry", "version", version,
 	})
 
-	// Then run CD
-	return m.CD(ctx, source, token)
+	// Publish to PyPI
+	publishOutput, err := m.Publish(ctx, source, token)
+	if err != nil {
+		return "", fmt.Errorf("error publishing to PyPI: %v", err)
+	}
+	fmt.Println("Publish output:", publishOutput)
+
+	return version, nil
+}
+
+func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
+	container := dag.Container().
+			From("node:lts-slim").
+			WithDirectory("/src", source).
+			WithWorkdir("/src").
+			WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN"))
+
+	// Install semantic-release and plugins
+	container = container.WithExec([]string{
+		"npm", "install", "-g",
+		"semantic-release",
+		"@semantic-release/changelog",
+		"@semantic-release/git",
+		"@semantic-release/github",
+	})
+
+	// Configure Git
+	container = container.WithExec([]string{
+		"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com",
+	}).WithExec([]string{
+		"git", "config", "--global", "user.name", "github-actions[bot]",
+	})
+
+	// Run semantic-release
+	output, err := container.WithExec([]string{"npx", "semantic-release"}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error running semantic-release: %v", err)
+	}
+
+	// Extract version from output
+	// This is a simplified version extraction, you might need to adjust based on semantic-release output
+	version := strings.TrimSpace(output)
+	if version == "" {
+		return "", fmt.Errorf("no version found in semantic-release output")
+	}
+
+	return version, nil
 }
 
 // findPyProjectToml recursively searches for pyproject.toml file

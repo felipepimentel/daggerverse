@@ -8,11 +8,13 @@ A collection of high-quality Dagger modules designed to streamline your CI/CD wo
 
 A comprehensive Python module that streamlines Poetry-based Python development workflows. Features include:
 
-- 🏗️ Poetry integration and dependency management
+- 🔄 Automatic version management with semantic-release
+- 🔍 Automatic project structure detection
+- 📦 Poetry integration and dependency management
 - 🧪 Advanced testing with coverage reporting
-- 📦 Automated package building and publishing
-- 🔄 Built-in Git operations and authentication
-- 🔍 Code quality tools (linting, formatting)
+- 🚀 Automated package building and publishing
+- 🔐 Built-in Git operations and authentication
+- 🎨 Code quality tools (linting, formatting)
 - 📚 Documentation generation
 - 💾 Optimized caching
 
@@ -31,8 +33,9 @@ A comprehensive Python module that streamlines Poetry-based Python development w
    ```
 
 3. **Usage**:
-   ```go
-   // See individual module documentation for detailed usage examples
+   ```bash
+   # Run complete CI/CD pipeline
+   dagger -m github.com/felipepimentel/daggerverse/python call cicd --source . --token env:PYPI_TOKEN
    ```
 
 ## Module Structure
@@ -77,12 +80,43 @@ module/
 
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on:
+We welcome contributions! Please follow our commit message format:
 
-- Code of Conduct
-- Development process
-- Commit message format
-- Pull request process
+```
+type(scope): subject
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+
+- `feat`: A new feature (minor version)
+- `fix`: A bug fix (patch version)
+- `perf`: A code change that improves performance (patch version)
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `test`: Adding missing tests or correcting existing tests
+- `build`: Changes that affect the build system or external dependencies
+- `ci`: Changes to our CI configuration files and scripts
+- `chore`: Other changes that don't modify src or test files
+
+### Breaking Changes
+
+Breaking changes must be indicated by:
+
+1. `!` after the type/scope
+2. `BREAKING CHANGE:` in the footer
+
+Example:
+
+```
+feat(python)!: change module API interface
+
+BREAKING CHANGE: The BuildConfig interface now requires explicit cache configuration.
+```
 
 ## License
 

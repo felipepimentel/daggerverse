@@ -4,13 +4,14 @@ A Dagger module for Python projects that provides CI/CD capabilities with Poetry
 
 ## Features
 
-- Automatic project structure detection (finds `pyproject.toml` automatically)
-- Poetry-based dependency management
-- Test execution with pytest
-- Code quality tools (linting and formatting)
-- Documentation generation
-- PyPI publishing
-- Flexible configuration options
+- 🔄 Automatic version management with semantic-release
+- 🔍 Automatic project structure detection (finds `pyproject.toml` automatically)
+- 📦 Poetry-based dependency management
+- 🧪 Test execution with pytest
+- 🎨 Code quality tools (linting and formatting)
+- 📚 Documentation generation
+- 🚀 PyPI publishing
+- ⚙️ Flexible configuration options
 
 ## Usage
 
@@ -39,7 +40,13 @@ fmt.Println(output)
 
 - `CI`: Runs tests and builds the package
 - `CD`: Publishes the package to PyPI
-- `CICD`: Runs the complete pipeline (CI + CD)
+- `CICD`: Runs the complete pipeline:
+  1. Bumps version using semantic-release
+  2. Runs tests with coverage
+  3. Performs linting and formatting
+  4. Builds the package
+  5. Updates version in pyproject.toml
+  6. Publishes to PyPI
 
 ### Individual Functions
 
@@ -93,38 +100,36 @@ python := dag.Python().WithPyPIConfig(&PyPIConfig{
   - Can be provided via environment variable
   - Can be stored in `.env` file
   - Can be passed directly as a secret
+- `GITHUB_TOKEN`: GitHub token (required for semantic-release)
+  - Used for version management and release creation
 
 ## Examples
 
 ### Running Tests with Coverage
 
-```go
-output, err := python.Test(ctx, dag.Host().Directory("."))
+```bash
+dagger -m github.com/felipepimentel/daggerverse/python call test --source .
 ```
 
 ### Publishing to PyPI
 
-```go
-token := dag.SetSecret("PYPI_TOKEN", os.Getenv("PYPI_TOKEN"))
-output, err := python.Publish(ctx, dag.Host().Directory("."), token)
+```bash
+dagger -m github.com/felipepimentel/daggerverse/python call cd --source . --token env:PYPI_TOKEN
 ```
 
 ### Complete CI/CD Pipeline
 
-```go
-token := dag.SetSecret("PYPI_TOKEN", os.Getenv("PYPI_TOKEN"))
-output, err := python.CICD(ctx, dag.Host().Directory("."), token)
+```bash
+dagger -m github.com/felipepimentel/daggerverse/python call cicd --source . --token env:PYPI_TOKEN
 ```
 
 ## GitHub Actions Integration
 
 ```yaml
-name: CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
 
 jobs:
@@ -132,39 +137,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dagger/dagger-action@v1
         with:
-          module: github.com/dagger/daggerverse/python@main
+          fetch-depth: 0
+
+      - name: Run Pipeline
+        uses: dagger/dagger-for-github@v7
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          # Run only CI for pull requests
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            dagger call ci --source .
-          else
-            # Run complete CI/CD pipeline for pushes to main
-            dagger call cicd --source . --token env:PYPI_TOKEN
-          fi
+        with:
+          verb: call
+          module: github.com/felipepimentel/daggerverse/python
+          args: cicd --source . --token env:PYPI_TOKEN
 ```
 
-## Command Line Usage
+## Version Management
 
-```bash
-# Run tests
-dagger -m github.com/felipepimentel/daggerverse/python call test --source .
+The module uses semantic-release to automatically manage versions based on commit messages. The version is determined by analyzing commit messages since the last release:
 
-# Run linting
-dagger -m github.com/felipepimentel/daggerverse/python call lint --source .
+- `feat:` commits trigger a minor version bump
+- `fix:` commits trigger a patch version bump
+- `perf:` commits trigger a patch version bump
+- Breaking changes (indicated by `!` or `BREAKING CHANGE:`) trigger a major version bump
 
-# Run formatting
-dagger -m github.com/felipepimentel/daggerverse/python call format --source .
+The version is automatically updated in:
 
-# Run CI pipeline
-dagger -m github.com/felipepimentel/daggerverse/python call ci --source .
-
-# Run CD pipeline
-dagger -m github.com/felipepimentel/daggerverse/python call cd --source . --token env:PYPI_TOKEN
-
-# Run complete CI/CD pipeline
-dagger -m github.com/felipepimentel/daggerverse/python call cicd --source . --token env:PYPI_TOKEN
-```
+- Git tags
+- GitHub releases
+- pyproject.toml
+- Release notes/changelog

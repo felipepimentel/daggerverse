@@ -2,8 +2,6 @@ module dagger/python
 
 go 1.22.7
 
-toolchain go1.23.4
-
 require (
 	github.com/99designs/gqlgen v0.17.57
 	github.com/Khan/genqlient v0.7.0
