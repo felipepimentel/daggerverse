@@ -197,58 +197,34 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 
 // BumpVersion increments the version based on commit messages
 func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
-	config := v.Config
-	if config == nil {
-		config = v.getDefaultConfig()
+	// Initialize config if nil
+	if v.Config == nil {
+		v.Config = v.getDefaultConfig()
 	}
 
-	// Get current version
+	// Get current version from files
 	currentVersion, err := v.GetCurrentVersion(ctx, source)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get current version: %w", err)
 	}
 
+	// Initialize container
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
-		WithWorkdir("/src")
+		WithWorkdir("/src").
+		WithExec([]string{"apk", "add", "--no-cache", "git"})
 
-	// Install git
-	container = container.WithExec([]string{
-		"apk", "add", "--no-cache", "git",
-	})
-
-	// Get all commits if no version exists or commits since last version
-	var output string
-	if v.hasTag(ctx, container, fmt.Sprintf("%s%s", config.TagPrefix, currentVersion)) {
-		// Try to get commits since the last tag
-		output, err = container.WithExec([]string{
-			"git", "log", "--format=%B%n-hash-%n%H",
-			fmt.Sprintf("%s%s..HEAD", config.TagPrefix, currentVersion),
-		}).Stdout(ctx)
-		if err != nil {
-			// If that fails, get all commits
-			output, err = container.WithExec([]string{
-				"git", "log", "--format=%B%n-hash-%n%H",
-			}).Stdout(ctx)
-			if err != nil {
-				return "", fmt.Errorf("failed to get git history: %w", err)
-			}
-		}
-	} else {
-		// Get all commits if no tag exists
-		output, err = container.WithExec([]string{
-			"git", "log", "--format=%B%n-hash-%n%H",
-		}).Stdout(ctx)
-		if err != nil {
-			return "", fmt.Errorf("failed to get git history: %w", err)
-		}
+	// Get all commits
+	output, err := container.WithExec([]string{
+		"git", "log", "--format=%B%n-hash-%n%H",
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get git history: %w", err)
 	}
 
 	// Analyze commits to determine version increment
-	increment := v.analyzeCommits(strings.Split(output, "\n"), config.CommitConfig)
-
-	// If no increment determined from commits, default to patch
+	increment := v.analyzeCommits(strings.Split(output, "\n"), v.Config.CommitConfig)
 	if increment == None {
 		increment = Patch
 	}
@@ -258,21 +234,27 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 
 	// Update version in files
 	if err := v.updateVersionInFiles(ctx, source, newVersion); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to update version in files: %w", err)
 	}
 
-	// Create git tag if enabled
-	if config.CreateTags {
-		tag := fmt.Sprintf("%s%s", config.TagPrefix, newVersion)
-		if err := v.createTag(ctx, source, tag); err != nil {
-			return "", err
-		}
-	}
+	// Create git tag
+	if v.Config.CreateTags {
+		tag := fmt.Sprintf("%s%s", v.Config.TagPrefix, newVersion)
+		container = container.
+			WithExec([]string{"git", "config", "--global", "user.email", "versioner@dagger.io"}).
+			WithExec([]string{"git", "config", "--global", "user.name", "Dagger Versioner"})
 
-	// Generate changelog if enabled
-	if config.GenerateChangelog {
-		if err := v.generateChangelog(ctx, source, newVersion); err != nil {
-			return "", err
+		// Add and commit version changes
+		container = container.
+			WithExec([]string{"git", "add", "."}).
+			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s", newVersion)})
+
+		// Create and push tag
+		_, err = container.
+			WithExec([]string{"git", "tag", "-a", tag, "-m", fmt.Sprintf("Release %s", tag)}).
+			Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to create git tag: %w", err)
 		}
 	}
 
@@ -370,56 +352,45 @@ func (v *Versioner) parseInt(s string) int {
 
 // updateVersionInFiles updates version in all configured files
 func (v *Versioner) updateVersionInFiles(ctx context.Context, source *dagger.Directory, version string) error {
-	config := v.Config
-	if config == nil {
-		config = v.getDefaultConfig()
-	}
-
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
 		WithWorkdir("/src")
 
-	// Install required tools
-	container = container.WithExec([]string{
-		"apk", "add", "--no-cache", "python3", "py3-pip", "poetry",
-	})
-
-	// Try to update version in each supported file
-	for _, file := range config.VersionFiles {
-		if _, err := source.File(file).Contents(ctx); err == nil {
-			switch file {
-			case "pyproject.toml":
-				// Use poetry version command for pyproject.toml
-				_, err := container.WithExec([]string{
-					"poetry", "version", version,
-				}).Stdout(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
-				}
-			case "package.json":
-				// Use npm version command for package.json
-				_, err := container.WithExec([]string{
-					"npm", "version", version, "--no-git-tag-version",
-				}).Stdout(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update version in package.json: %w", err)
-				}
-			default:
-				// For other files, use sed
-				_, err := container.WithExec([]string{
-					"sed", "-i",
-					fmt.Sprintf("s/%s/version = \"%s\"/g", config.VersionPattern, version),
-					file,
-				}).Stdout(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update version in %s: %w", file, err)
-				}
-			}
+	// Check if pyproject.toml exists and update it
+	if _, err := source.File("pyproject.toml").Contents(ctx); err == nil {
+		container = container.
+			WithExec([]string{"apk", "add", "--no-cache", "python3", "py3-pip", "poetry"})
+		
+		_, err := container.
+			WithExec([]string{"poetry", "version", version}).
+			Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
 		}
+		return nil
 	}
 
-	return nil
+	// Check if package.json exists and update it
+	if _, err := source.File("package.json").Contents(ctx); err == nil {
+		container = container.
+			WithExec([]string{"apk", "add", "--no-cache", "nodejs", "npm"})
+		
+		_, err := container.
+			WithExec([]string{"npm", "version", version, "--no-git-tag-version"}).
+			Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update version in package.json: %w", err)
+		}
+		return nil
+	}
+
+	// If no recognized files found, create VERSION file
+	_, err := container.
+		WithNewFile("VERSION", version).
+		Stdout(ctx)
+	
+	return err
 }
 
 // createTag creates a git tag for the new version
