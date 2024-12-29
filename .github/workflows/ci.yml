@@ -24,4 +24,4 @@ jobs:
       module-path: "."
     secrets:
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
