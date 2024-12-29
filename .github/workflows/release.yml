@@ -17,15 +17,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: dagger/dagger-for-github@v5
+      - uses: dagger/dagger-for-github@v7
         with:
-          version: "0.9.3"
+          version: "0.15.1"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release
         run: |
-          dagger -m github.com/felipepimentel/daggerverse/python call cicd \
+          cd python && dagger call cicd \
             --source . \
             --token env:PYPI_TOKEN
         env:
