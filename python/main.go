@@ -1220,17 +1220,26 @@ func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagg
 }
 
 func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
+	// Get GitHub token from environment
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		return "", fmt.Errorf("GITHUB_TOKEN environment variable is required")
+	}
+
 	// Setup container with Node.js and required tools
 	container := dag.Container().
 		From("node:lts-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
-		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
+		WithEnvVariable("GITHUB_TOKEN", githubToken).
+		WithEnvVariable("GH_TOKEN", githubToken). // semantic-release também verifica esta variável
 		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
 		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
 		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com").
-		// Install git and ssh
+		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com")
+
+	// Install required packages
+	container = container.
 		WithExec([]string{"apt-get", "update"}).
 		WithExec([]string{"apt-get", "install", "-y", "git", "openssh-client"})
 
@@ -1243,32 +1252,30 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		"@semantic-release/github",
 	})
 
-	// Configure Git
+	// Configure Git with token-based authentication
 	container = container.WithExec([]string{
-		"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com",
-	}).WithExec([]string{
-		"git", "config", "--global", "user.name", "github-actions[bot]",
+		"git", "config", "--global", "url.https://x-access-token:" + githubToken + "@github.com/.insteadOf", "https://github.com/",
 	})
 
+	// Configure Git user
+	container = container.
+		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
+
 	// Run semantic-release with explicit configuration
-	container = container.WithExec([]string{
-		"npx", "semantic-release", 
+	output, err := container.WithExec([]string{
+		"npx", "semantic-release",
 		"--branches", "main",
 		"--ci", "false", // Disable CI detection since we're running in Dagger
 		"--debug", // Enable debug logging
-	})
-
-	// Get latest tag
-	tagOutput, err := container.WithExec([]string{
-		"git", "describe", "--tags", "--abbrev=0",
 	}).Stdout(ctx)
+
 	if err != nil {
-		return "", fmt.Errorf("error getting latest tag: %v", err)
+		return "", fmt.Errorf("error running semantic-release: %v", err)
 	}
 
 	// Extract version from output
-	// This is a simplified version extraction, you might need to adjust based on semantic-release output
-	version := strings.TrimSpace(tagOutput)
+	version := strings.TrimSpace(output)
 	if version == "" {
 		return "", fmt.Errorf("no version found in semantic-release output")
 	}
