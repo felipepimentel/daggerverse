@@ -28,5 +28,4 @@ jobs:
           verb: run
           module: ./.dagger/release/release.go
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

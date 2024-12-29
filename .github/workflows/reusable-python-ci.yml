@@ -30,7 +30,7 @@ jobs:
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
