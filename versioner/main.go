@@ -103,16 +103,16 @@ func (v *Versioner) getDefaultConfig() *VersionConfig {
 		Strategy:          "semver",
 		TagPrefix:         "v",
 		VersionFiles:      []string{"pyproject.toml", "package.json", "VERSION"},
-		VersionPattern:    `version\s*=\s*["']?(\d+\.\d+\.\d+)["']?`,
+		VersionPattern:    `version\s*=\s*["']?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?)["']?`,
 		ValidateCommits:   true,
 		GenerateChangelog: true,
 		CreateTags:        true,
 		BranchConfig: &BranchConfig{
 			MainBranch:          "main",
-			DevelopBranch:       "develop",
-			ReleaseBranchPrefix: "release/",
-			HotfixBranchPrefix:  "hotfix/",
-			FeatureBranchPrefix: "feature/",
+				DevelopBranch:       "develop",
+				ReleaseBranchPrefix: "release/",
+				HotfixBranchPrefix:  "hotfix/",
+				FeatureBranchPrefix: "feature/",
 		},
 		CommitConfig: &CommitConfig{
 			Types: []CommitType{
@@ -155,6 +155,18 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 		config = v.getDefaultConfig()
 	}
 
+	// First try to find version in project files
+	for _, file := range config.VersionFiles {
+		if contents, err := source.File(file).Contents(ctx); err == nil {
+			re := regexp.MustCompile(config.VersionPattern)
+			matches := re.FindStringSubmatch(contents)
+			if len(matches) > 1 && v.isValidSemVer(matches[1]) {
+				return matches[1], nil
+			}
+		}
+	}
+
+	// If no version found in files, try git tags
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -165,7 +177,7 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 		"apk", "add", "--no-cache", "git",
 	})
 
-	// Try to get version from git tags first
+	// Try to get version from git tags
 	output, err := container.WithExec([]string{
 		"git", "describe", "--tags", "--abbrev=0",
 	}).Stdout(ctx)
@@ -176,24 +188,6 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 		version = strings.TrimPrefix(version, config.TagPrefix)
 		if v.isValidSemVer(version) {
 			return version, nil
-		}
-	}
-
-	// If no git tag, try to find version in files
-	for _, file := range config.VersionFiles {
-		if _, err := source.File(file).Contents(ctx); err == nil {
-			container = container.WithExec([]string{
-				"grep", "-E", config.VersionPattern, file,
-			})
-			
-			output, err := container.Stdout(ctx)
-			if err == nil {
-				re := regexp.MustCompile(config.VersionPattern)
-				matches := re.FindStringSubmatch(output)
-				if len(matches) > 1 && v.isValidSemVer(matches[1]) {
-					return matches[1], nil
-				}
-			}
 		}
 	}
 
@@ -370,18 +364,39 @@ func (v *Versioner) updateVersionInFiles(ctx context.Context, source *dagger.Dir
 
 	// Install required tools
 	container = container.WithExec([]string{
-		"apk", "add", "--no-cache", "sed",
+		"apk", "add", "--no-cache", "python3", "py3-pip", "poetry",
 	})
 
+	// Try to update version in each supported file
 	for _, file := range config.VersionFiles {
 		if _, err := source.File(file).Contents(ctx); err == nil {
-			_, err := container.WithExec([]string{
-				"sed", "-i",
-				fmt.Sprintf("s/%s/version = \"%s\"/g", config.VersionPattern, version),
-				file,
-			}).Stdout(ctx)
-			if err != nil {
-				return err
+			switch file {
+			case "pyproject.toml":
+				// Use poetry version command for pyproject.toml
+				_, err := container.WithExec([]string{
+					"poetry", "version", version,
+				}).Stdout(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
+				}
+			case "package.json":
+				// Use npm version command for package.json
+				_, err := container.WithExec([]string{
+					"npm", "version", version, "--no-git-tag-version",
+				}).Stdout(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to update version in package.json: %w", err)
+				}
+			default:
+				// For other files, use sed
+				_, err := container.WithExec([]string{
+					"sed", "-i",
+					fmt.Sprintf("s/%s/version = \"%s\"/g", config.VersionPattern, version),
+					file,
+				}).Stdout(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to update version in %s: %w", file, err)
+				}
 			}
 		}
 	}
