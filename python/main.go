@@ -1226,9 +1226,13 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
-		// Install git first
+		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
+		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
+		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
+		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com").
+		// Install git and ssh
 		WithExec([]string{"apt-get", "update"}).
-		WithExec([]string{"apt-get", "install", "-y", "git"})
+		WithExec([]string{"apt-get", "install", "-y", "git", "openssh-client"})
 
 	// Install semantic-release and dependencies
 	container = container.WithExec([]string{
@@ -1246,15 +1250,25 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		"git", "config", "--global", "user.name", "github-actions[bot]",
 	})
 
-	// Run semantic-release
-	output, err := container.WithExec([]string{"npx", "semantic-release"}).Stdout(ctx)
+	// Run semantic-release with explicit configuration
+	container = container.WithExec([]string{
+		"npx", "semantic-release", 
+		"--branches", "main",
+		"--ci", "false", // Disable CI detection since we're running in Dagger
+		"--debug", // Enable debug logging
+	})
+
+	// Get latest tag
+	tagOutput, err := container.WithExec([]string{
+		"git", "describe", "--tags", "--abbrev=0",
+	}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error running semantic-release: %v", err)
+		return "", fmt.Errorf("error getting latest tag: %v", err)
 	}
 
 	// Extract version from output
 	// This is a simplified version extraction, you might need to adjust based on semantic-release output
-	version := strings.TrimSpace(output)
+	version := strings.TrimSpace(tagOutput)
 	if version == "" {
 		return "", fmt.Errorf("no version found in semantic-release output")
 	}
