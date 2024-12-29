@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
 jobs:
   python-pipeline:
     uses: ./.github/workflows/reusable-python-ci.yml
