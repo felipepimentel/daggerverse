@@ -218,25 +218,40 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 		"apk", "add", "--no-cache", "git",
 	})
 
-	// Get commits since last version or all commits if no version exists
+	// Get all commits if no version exists or commits since last version
 	var output string
 	if v.hasTag(ctx, container, fmt.Sprintf("%s%s", config.TagPrefix, currentVersion)) {
+		// Try to get commits since the last tag
 		output, err = container.WithExec([]string{
 			"git", "log", "--format=%B%n-hash-%n%H",
 			fmt.Sprintf("%s%s..HEAD", config.TagPrefix, currentVersion),
 		}).Stdout(ctx)
+		if err != nil {
+			// If that fails, get all commits
+			output, err = container.WithExec([]string{
+				"git", "log", "--format=%B%n-hash-%n%H",
+			}).Stdout(ctx)
+			if err != nil {
+				return "", fmt.Errorf("failed to get git history: %w", err)
+			}
+		}
 	} else {
+		// Get all commits if no tag exists
 		output, err = container.WithExec([]string{
 			"git", "log", "--format=%B%n-hash-%n%H",
 		}).Stdout(ctx)
-	}
-
-	if err != nil {
-		return "", err
+		if err != nil {
+			return "", fmt.Errorf("failed to get git history: %w", err)
+		}
 	}
 
 	// Analyze commits to determine version increment
 	increment := v.analyzeCommits(strings.Split(output, "\n"), config.CommitConfig)
+
+	// If no increment determined from commits, default to patch
+	if increment == None {
+		increment = Patch
+	}
 
 	// Bump version according to semver rules
 	newVersion := v.incrementVersion(currentVersion, increment)
@@ -266,9 +281,12 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 
 // hasTag checks if a specific tag exists
 func (v *Versioner) hasTag(ctx context.Context, container *dagger.Container, tag string) bool {
+	// Try to get the tag
 	_, err := container.WithExec([]string{
 		"git", "rev-parse", "--verify", tag,
 	}).Stdout(ctx)
+	
+	// Return true only if the tag exists
 	return err == nil
 }
 
@@ -448,14 +466,25 @@ func (v *Versioner) generateChangelog(ctx context.Context, source *dagger.Direct
 		"apk", "add", "--no-cache", "git",
 	})
 
-	// Get commits since last version
-	output, err := container.WithExec([]string{
-		"git", "log", "--format=%B%n-hash-%n%H",
-		fmt.Sprintf("%s%s..HEAD", config.TagPrefix, version),
-	}).Stdout(ctx)
+	// Get all commits if this is the first version
+	var output string
+	var err error
+	
+	if v.hasTag(ctx, container, fmt.Sprintf("%s%s", config.TagPrefix, version)) {
+		// Get commits since last version
+		output, err = container.WithExec([]string{
+			"git", "log", "--format=%B%n-hash-%n%H",
+			fmt.Sprintf("%s%s..HEAD", config.TagPrefix, version),
+		}).Stdout(ctx)
+	} else {
+		// Get all commits for first version
+		output, err = container.WithExec([]string{
+			"git", "log", "--format=%B%n-hash-%n%H",
+		}).Stdout(ctx)
+	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get git history: %w", err)
 	}
 
 	// Parse commits and generate changelog
