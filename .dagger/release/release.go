@@ -133,9 +133,13 @@ func releaseModule(ctx context.Context, client *dagger.Client, src *dagger.Direc
 	// Publish to Daggerverse with specific version
 	publishContainer := client.Container().
 		From("alpine:latest").
+		// Install curl and Dagger CLI
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"/bin/sh", "-c", "cd /usr/local && curl -L https://dl.dagger.io/dagger/install.sh | sh"}).
 		WithDirectory("/src", src).
 		WithWorkdir(fmt.Sprintf("/src/%s", module)).
-		WithExec([]string{"dagger", "publish", "--tag", version})
+		// Use dagger publish with the correct version tag
+		WithExec([]string{"/usr/local/bin/dagger", "publish", "--tag", version})
 
 	_, err = publishContainer.Sync(ctx)
 	if err != nil {
