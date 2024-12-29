@@ -1,0 +1,41 @@
+name: Python CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      python-module-version:
+        description: "Versão do módulo Python"
+        default: "main"
+        required: false
+        type: string
+      source-path:
+        description: "Caminho do código fonte"
+        default: "."
+        required: false
+        type: string
+    secrets:
+      PYPI_TOKEN:
+        description: "Token do PyPI para publicação"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Pipeline
+        uses: dagger/dagger-for-github@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        with:
+          verb: call
+          module: github.com/felipepimentel/daggerverse/python@${{ inputs.python-module-version }}
+          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN

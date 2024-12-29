@@ -1,9 +1,16 @@
-name: Release
+name: Release Dagger Module
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      module-path:
+        description: "Path to the Dagger module"
+        required: false
+        type: string
+        default: "."
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 permissions:
   contents: write
@@ -29,4 +36,3 @@ jobs:
           cd .dagger/release && go run release.go
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
