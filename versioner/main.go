@@ -224,11 +224,18 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 		"apk", "add", "--no-cache", "git",
 	})
 
-	// Get commits since last version
-	output, err := container.WithExec([]string{
-		"git", "log", "--format=%B%n-hash-%n%H",
-		fmt.Sprintf("%s%s..HEAD", config.TagPrefix, currentVersion),
-	}).Stdout(ctx)
+	// Get commits since last version or all commits if no version exists
+	var output string
+	if v.hasTag(ctx, container, fmt.Sprintf("%s%s", config.TagPrefix, currentVersion)) {
+		output, err = container.WithExec([]string{
+			"git", "log", "--format=%B%n-hash-%n%H",
+			fmt.Sprintf("%s%s..HEAD", config.TagPrefix, currentVersion),
+		}).Stdout(ctx)
+	} else {
+		output, err = container.WithExec([]string{
+			"git", "log", "--format=%B%n-hash-%n%H",
+		}).Stdout(ctx)
+	}
 
 	if err != nil {
 		return "", err
@@ -261,6 +268,14 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 	}
 
 	return newVersion, nil
+}
+
+// hasTag checks if a specific tag exists
+func (v *Versioner) hasTag(ctx context.Context, container *dagger.Container, tag string) bool {
+	_, err := container.WithExec([]string{
+		"git", "rev-parse", "--verify", tag,
+	}).Stdout(ctx)
+	return err == nil
 }
 
 // isValidSemVer checks if a version string follows semantic versioning
