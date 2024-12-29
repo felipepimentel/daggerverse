@@ -18,10 +18,19 @@ permissions:
   id-token: write
   issues: write
   pull-requests: write
+  packages: write
+  statuses: write
 
 jobs:
   pipeline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+      packages: write
+      statuses: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,9 +39,10 @@ jobs:
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python
-          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN --token env:GITHUB_TOKEN
+          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN
