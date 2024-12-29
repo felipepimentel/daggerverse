@@ -12,6 +12,9 @@ on:
       PYPI_TOKEN:
         description: "PyPI token for publishing"
         required: true
+      GH_PAT:
+        description: "GitHub Personal Access Token"
+        required: true
 
 permissions:
   contents: write
@@ -26,13 +29,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ github.token }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
