@@ -3,11 +3,6 @@ name: Python CI Pipeline
 on:
   workflow_call:
     inputs:
-      python-module-version:
-        description: "Python module version"
-        default: "main"
-        required: false
-        type: string
       source-path:
         description: "Source code path"
         default: "."
@@ -39,5 +34,5 @@ jobs:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
-          module: github.com/felipepimentel/daggerverse/python@${{ inputs.python-module-version }}
+          module: github.com/felipepimentel/daggerverse/python
           args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN
