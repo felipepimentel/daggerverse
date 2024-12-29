@@ -157,41 +157,22 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 
 	// First try to find version in project files
 	for _, file := range config.VersionFiles {
+		fmt.Printf("Checking file: %s\n", file)
 		if contents, err := source.File(file).Contents(ctx); err == nil {
+			fmt.Printf("Found file: %s\n", file)
 			re := regexp.MustCompile(config.VersionPattern)
 			matches := re.FindStringSubmatch(contents)
 			if len(matches) > 1 && v.isValidSemVer(matches[1]) {
+				fmt.Printf("Found version %s in %s\n", matches[1], file)
 				return matches[1], nil
 			}
+			fmt.Printf("No valid version found in %s\n", file)
+		} else {
+			fmt.Printf("Error reading %s: %v\n", file, err)
 		}
 	}
 
-	// If no version found in files, try git tags
-	container := dag.Container().
-		From("alpine:latest").
-		WithDirectory("/src", source).
-		WithWorkdir("/src")
-
-	// Install git
-	container = container.WithExec([]string{
-		"apk", "add", "--no-cache", "git",
-	})
-
-	// Try to get version from git tags
-	output, err := container.WithExec([]string{
-		"git", "describe", "--tags", "--abbrev=0",
-	}).Stdout(ctx)
-
-	if err == nil && output != "" {
-		// Clean the version string
-		version := strings.TrimSpace(output)
-		version = strings.TrimPrefix(version, config.TagPrefix)
-		if v.isValidSemVer(version) {
-			return version, nil
-		}
-	}
-
-	// If no version found, return default
+	fmt.Println("No version found in files, returning default 0.1.0")
 	return "0.1.0", nil
 }
 
@@ -359,6 +340,7 @@ func (v *Versioner) updateVersionInFiles(ctx context.Context, source *dagger.Dir
 
 	// Check if pyproject.toml exists and update it
 	if _, err := source.File("pyproject.toml").Contents(ctx); err == nil {
+		fmt.Printf("Updating version to %s in pyproject.toml\n", version)
 		container = container.
 			WithExec([]string{"apk", "add", "--no-cache", "python3", "py3-pip", "poetry"})
 		
@@ -366,31 +348,15 @@ func (v *Versioner) updateVersionInFiles(ctx context.Context, source *dagger.Dir
 			WithExec([]string{"poetry", "version", version}).
 			Stdout(ctx)
 		if err != nil {
+			fmt.Printf("Error updating pyproject.toml: %v\n", err)
 			return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
 		}
+		fmt.Printf("Successfully updated pyproject.toml to version %s\n", version)
 		return nil
 	}
 
-	// Check if package.json exists and update it
-	if _, err := source.File("package.json").Contents(ctx); err == nil {
-		container = container.
-			WithExec([]string{"apk", "add", "--no-cache", "nodejs", "npm"})
-		
-		_, err := container.
-			WithExec([]string{"npm", "version", version, "--no-git-tag-version"}).
-			Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to update version in package.json: %w", err)
-		}
-		return nil
-	}
-
-	// If no recognized files found, create VERSION file
-	_, err := container.
-		WithNewFile("VERSION", version).
-		Stdout(ctx)
-	
-	return err
+	fmt.Println("No recognized version files found")
+	return nil
 }
 
 // createTag creates a git tag for the new version
