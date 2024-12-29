@@ -121,17 +121,27 @@ func releaseModule(ctx context.Context, client *dagger.Client, src *dagger.Direc
 		return nil
 	}
 
-	// Publish to Daggerverse
+	// Extract version from tag (format: module/vX.Y.Z)
+	version := strings.TrimSpace(tagOutput)
+	version = strings.TrimPrefix(version, fmt.Sprintf("%s/", module))
+
+	// Validate semantic version format
+	if !strings.HasPrefix(version, "v") || len(strings.Split(strings.TrimPrefix(version, "v"), ".")) != 3 {
+		return fmt.Errorf("invalid semantic version format: %s", version)
+	}
+
+	// Publish to Daggerverse with specific version
 	publishContainer := client.Container().
 		From("alpine:latest").
 		WithDirectory("/src", src).
 		WithWorkdir(fmt.Sprintf("/src/%s", module)).
-		WithExec([]string{"dagger", "publish"})
+		WithExec([]string{"dagger", "publish", "--tag", version})
 
 	_, err = publishContainer.Sync(ctx)
 	if err != nil {
 		return fmt.Errorf("error publishing to Daggerverse: %v", err)
 	}
 
+	fmt.Printf("Successfully published %s with version %s\n", module, version)
 	return nil
 } 
