@@ -1,3 +1,4 @@
+# ci.yml
 name: CI/CD
 
 on:
@@ -9,19 +10,27 @@ on:
 permissions:
   contents: write
   id-token: write
-  issues: write
-  pull-requests: write
+  issues: read
+  pull-requests: read
 
 jobs:
-  python-pipeline:
-    uses: ./.github/workflows/reusable-modules-ci.yml
-    permissions:
-      contents: write
-      id-token: write
-      issues: write
-      pull-requests: write
-    with:
-      module-path: "."
-    secrets:
-      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Prerequisites
+        run: |
+          dagger version
+
+      - name: Run Release Pipeline
+        uses: dagger/dagger-for-github@v7
+        with:
+          verb: run
+          module: ./.dagger/release/release.go
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
