@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   release:
@@ -25,9 +26,7 @@ jobs:
 
       - name: Release
         run: |
-          cd python && dagger call cicd \
-            --source . \
-            --token env:PYPI_TOKEN
+          cd .dagger/release && go run release.go
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
