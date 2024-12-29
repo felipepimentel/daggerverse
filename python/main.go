@@ -1171,11 +1171,17 @@ func (m *Python) CD(ctx context.Context, source *dagger.Directory, token *dagger
 }
 
 // CICD runs the complete CI/CD pipeline (test, build, and publish)
-func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret, version string) (string, error) {
 	// Run CI first
 	if _, err := m.CI(ctx, source); err != nil {
 		return "", err
 	}
+
+	// Update version in pyproject.toml
+	container := m.BuildEnv(source)
+	container = container.WithExec([]string{
+		"poetry", "version", version,
+	})
 
 	// Then run CD
 	return m.CD(ctx, source, token)

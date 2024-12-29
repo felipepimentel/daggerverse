@@ -102,17 +102,14 @@ func (v *Versioner) getDefaultConfig() *VersionConfig {
 	return &VersionConfig{
 		Strategy:          "semver",
 		TagPrefix:         "v",
-		VersionFiles:      []string{"pyproject.toml", "package.json", "VERSION"},
-		VersionPattern:    `version\s*=\s*["']?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?)["']?`,
 		ValidateCommits:   true,
-		GenerateChangelog: true,
 		CreateTags:        true,
 		BranchConfig: &BranchConfig{
 			MainBranch:          "main",
-				DevelopBranch:       "develop",
-				ReleaseBranchPrefix: "release/",
-				HotfixBranchPrefix:  "hotfix/",
-				FeatureBranchPrefix: "feature/",
+			DevelopBranch:       "develop",
+			ReleaseBranchPrefix: "release/",
+			HotfixBranchPrefix:  "hotfix/",
+			FeatureBranchPrefix: "feature/",
 		},
 		CommitConfig: &CommitConfig{
 			Types: []CommitType{
@@ -155,24 +152,26 @@ func (v *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 		config = v.getDefaultConfig()
 	}
 
-	// First try to find version in project files
-	for _, file := range config.VersionFiles {
-		fmt.Printf("Checking file: %s\n", file)
-		if contents, err := source.File(file).Contents(ctx); err == nil {
-			fmt.Printf("Found file: %s\n", file)
-			re := regexp.MustCompile(config.VersionPattern)
-			matches := re.FindStringSubmatch(contents)
-			if len(matches) > 1 && v.isValidSemVer(matches[1]) {
-				fmt.Printf("Found version %s in %s\n", matches[1], file)
-				return matches[1], nil
-			}
-			fmt.Printf("No valid version found in %s\n", file)
-		} else {
-			fmt.Printf("Error reading %s: %v\n", file, err)
+	// Try to get version from git tags first
+	container := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"apk", "add", "--no-cache", "git"})
+
+	output, err := container.WithExec([]string{
+		"git", "describe", "--tags", "--abbrev=0",
+	}).Stdout(ctx)
+
+	if err == nil && output != "" {
+		version := strings.TrimSpace(output)
+		version = strings.TrimPrefix(version, config.TagPrefix)
+		if v.isValidSemVer(version) {
+			return version, nil
 		}
 	}
 
-	fmt.Println("No version found in files, returning default 0.1.0")
+	// If no git tag, return initial version
 	return "0.1.0", nil
 }
 
@@ -183,7 +182,7 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 		v.Config = v.getDefaultConfig()
 	}
 
-	// Get current version from files
+	// Get current version from git tags
 	currentVersion, err := v.GetCurrentVersion(ctx, source)
 	if err != nil {
 		return "", fmt.Errorf("failed to get current version: %w", err)
@@ -213,11 +212,6 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 	// Bump version according to semver rules
 	newVersion := v.incrementVersion(currentVersion, increment)
 
-	// Update version in files
-	if err := v.updateVersionInFiles(ctx, source, newVersion); err != nil {
-		return "", fmt.Errorf("failed to update version in files: %w", err)
-	}
-
 	// Create git tag
 	if v.Config.CreateTags {
 		tag := fmt.Sprintf("%s%s", v.Config.TagPrefix, newVersion)
@@ -225,12 +219,7 @@ func (v *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 			WithExec([]string{"git", "config", "--global", "user.email", "versioner@dagger.io"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "Dagger Versioner"})
 
-		// Add and commit version changes
-		container = container.
-			WithExec([]string{"git", "add", "."}).
-			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s", newVersion)})
-
-		// Create and push tag
+		// Create tag
 		_, err = container.
 			WithExec([]string{"git", "tag", "-a", tag, "-m", fmt.Sprintf("Release %s", tag)}).
 			Stdout(ctx)
