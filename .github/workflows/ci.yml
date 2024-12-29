@@ -19,4 +19,3 @@ jobs:
       module-path: "."
     secrets:
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-      GH_PAT: ${{ secrets.GH_PAT }}
