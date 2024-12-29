@@ -22,10 +22,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate Prerequisites
-        run: |
-          dagger version
-
       - name: Run Release Pipeline
         uses: dagger/dagger-for-github@v7
         with:
