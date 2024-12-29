@@ -1,4 +1,4 @@
-name: Release Dagger Module
+name: Modules CI Pipeline
 
 on:
   workflow_call:
@@ -8,12 +8,16 @@ on:
         required: false
         type: string
         default: "."
-    secrets: {}
+    secrets:
+      PYPI_TOKEN:
+        description: "PyPI token for publishing"
+        required: true
 
 permissions:
   contents: write
-  packages: write
   id-token: write
+  issues: write
+  pull-requests: write
 
 jobs:
   release:
@@ -23,14 +27,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: dagger/dagger-for-github@v7
+      - name: Run Pipeline
+        uses: dagger/dagger-for-github@v7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
-          version: "0.15.1"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Release
-        run: |
-          cd .dagger/release && go run release.go
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          verb: call
+          module: github.com/felipepimentel/daggerverse/python
+          args: cicd --source ${{ inputs.module-path }} --token env:PYPI_TOKEN

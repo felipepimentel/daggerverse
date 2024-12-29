@@ -14,6 +14,8 @@ permissions:
 
 jobs:
   python-pipeline:
-    uses: ./.github/workflows/reusable-python-ci.yml
+    uses: ./.github/workflows/reusable-modules-ci.yml
+    with:
+      module-path: "."
     secrets:
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
