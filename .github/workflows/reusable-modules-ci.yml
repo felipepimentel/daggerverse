@@ -36,4 +36,4 @@ jobs:
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python
-          args: cicd --source ${{ inputs.module-path }} --token env:PYPI_TOKEN
+          args: cicd --source ${{ inputs.module-path }} --token env:PYPI_TOKEN --token env:GITHUB_TOKEN
