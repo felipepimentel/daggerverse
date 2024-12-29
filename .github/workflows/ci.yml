@@ -15,6 +15,11 @@ permissions:
 jobs:
   python-pipeline:
     uses: ./.github/workflows/reusable-modules-ci.yml
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
     with:
       module-path: "."
     secrets:
