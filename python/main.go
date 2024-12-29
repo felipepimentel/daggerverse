@@ -1220,13 +1220,17 @@ func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagg
 }
 
 func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
+	// Setup container with Node.js and required tools
 	container := dag.Container().
-			From("node:lts-slim").
-			WithDirectory("/src", source).
-			WithWorkdir("/src").
-			WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN"))
+		From("node:lts-slim").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
+		// Install git first
+		WithExec([]string{"apt-get", "update"}).
+		WithExec([]string{"apt-get", "install", "-y", "git"})
 
-	// Install semantic-release and plugins
+	// Install semantic-release and dependencies
 	container = container.WithExec([]string{
 		"npm", "install", "-g",
 		"semantic-release",
