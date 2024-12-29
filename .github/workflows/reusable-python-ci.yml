@@ -17,9 +17,6 @@ on:
       PYPI_TOKEN:
         description: "PyPI token for publishing"
         required: true
-      GITHUB_TOKEN:
-        description: "GitHub token for authentication"
-        required: true
 
 permissions:
   contents: read

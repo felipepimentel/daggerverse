@@ -8,9 +8,7 @@ on:
         required: false
         type: string
         default: "."
-    secrets:
-      GITHUB_TOKEN:
-        required: true
+    secrets: {}
 
 permissions:
   contents: write
