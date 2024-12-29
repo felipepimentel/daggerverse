@@ -4,18 +4,21 @@ on:
   workflow_call:
     inputs:
       python-module-version:
-        description: "Versão do módulo Python"
+        description: "Python module version"
         default: "main"
         required: false
         type: string
       source-path:
-        description: "Caminho do código fonte"
+        description: "Source code path"
         default: "."
         required: false
         type: string
     secrets:
       PYPI_TOKEN:
-        description: "Token do PyPI para publicação"
+        description: "PyPI token for publishing"
+        required: true
+      GITHUB_TOKEN:
+        description: "GitHub token for authentication"
         required: true
 
 permissions:
