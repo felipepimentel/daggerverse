@@ -8,11 +8,13 @@ on:
 
 permissions:
   contents: write
-  packages: write
   id-token: write
+  issues: write
+  pull-requests: write
 
 jobs:
   python-pipeline:
     uses: ./.github/workflows/reusable-python-ci.yml
     secrets:
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
