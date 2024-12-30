@@ -1251,10 +1251,30 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-	// Copy package.json and .releaserc.json to the source directory
+	// Create package.json in the source directory
+	packageJSON := `{
+		"name": "@daggerverse/python",
+		"version": "0.0.0-development",
+		"private": true,
+		"release": {
+			"branches": ["main"],
+			"plugins": [
+				"@semantic-release/commit-analyzer",
+				"@semantic-release/release-notes-generator",
+				"@semantic-release/changelog",
+				["@semantic-release/git", {
+					"assets": ["CHANGELOG.md"],
+					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+				}],
+				["@semantic-release/github", {
+					"assets": []
+				}]
+			]
+		}
+	}`
+
 	container = container.
-		WithExec([]string{"cp", "/src/python/package.json", "/src/"}).
-		WithExec([]string{"cp", "/src/python/.releaserc.json", "/src/"})
+		WithExec([]string{"bash", "-c", fmt.Sprintf("echo '%s' > /src/package.json", packageJSON)})
 
 	// Run semantic-release with explicit configuration
 	output, err := container.
