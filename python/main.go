@@ -1235,10 +1235,12 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		WithExec([]string{"apt-get", "update"}).
 		WithExec([]string{"apt-get", "install", "-y", "git", "openssh-client"})
 
-	// Install semantic-release and dependencies
+	// Install semantic-release and all required plugins
 	container = container.WithExec([]string{
 		"npm", "install", "-g",
 		"semantic-release",
+		"@semantic-release/commit-analyzer",
+		"@semantic-release/release-notes-generator",
 		"@semantic-release/changelog",
 		"@semantic-release/git",
 		"@semantic-release/github",
@@ -1250,12 +1252,15 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
 	// Run semantic-release with explicit configuration
-	output, err := container.WithExec([]string{
-		"npx", "semantic-release",
-		"--branches", "main",
-		"--ci", "false", // Disable CI detection since we're running in Dagger
-		"--debug", // Enable debug logging
-	}).Stdout(ctx)
+	output, err := container.
+		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
+		WithEnvVariable("GH_TOKEN", os.Getenv("GITHUB_TOKEN")).
+		WithExec([]string{
+			"npx", "semantic-release",
+			"--branches", "main",
+			"--ci", "false", // Disable CI detection since we're running in Dagger
+			"--debug", // Enable debug logging
+		}).Stdout(ctx)
 
 	if err != nil {
 		return "", fmt.Errorf("error running semantic-release: %v", err)
