@@ -1251,6 +1251,11 @@ func (m *Python) bumpVersion(ctx context.Context, source *dagger.Directory) (str
 		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
+	// Copy package.json and .releaserc.json to the source directory
+	container = container.
+		WithExec([]string{"cp", "/src/python/package.json", "/src/"}).
+		WithExec([]string{"cp", "/src/python/.releaserc.json", "/src/"})
+
 	// Run semantic-release with explicit configuration
 	output, err := container.
 		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
