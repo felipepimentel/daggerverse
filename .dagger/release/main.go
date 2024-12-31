@@ -34,6 +34,11 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		"git", "config", "--global", "url.https://oauth2:token@github.com/.insteadOf", "https://github.com/",
 	}).WithSecretVariable("token", token)
 
+	// Initialize Git repository and fetch tags
+	container = container.WithExec([]string{"git", "init"})
+	container = container.WithExec([]string{"git", "remote", "add", "origin", "https://github.com/felipepimentel/daggerverse.git"})
+	container = container.WithExec([]string{"git", "fetch", "--tags", "--force"})
+
 	// Get the last commit message
 	commitMsg, err := container.WithExec([]string{
 		"git", "log", "-1", "--pretty=%B",
