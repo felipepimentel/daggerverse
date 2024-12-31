@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"dagger.io/dagger"
+	"dagger/python-pipeline/internal/dagger"
 )
 
 // PythonPipeline orchestrates Python project workflows using Poetry and PyPI.
