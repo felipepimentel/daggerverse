@@ -5,113 +5,110 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
-	"dagger/versioner/internal/dagger"
+	"dagger.io/dagger"
 )
 
-// Versioner handles semantic versioning for projects.
-// It uses semantic-release to analyze commit messages and determine version bumps.
+// Versioner handles semantic versioning for Dagger modules
 type Versioner struct{}
 
-// New creates a new instance of Versioner.
-func New(ctx context.Context) (*Versioner, error) {
-	return &Versioner{}, nil
+// New creates a new instance of Versioner
+func New() *Versioner {
+	return &Versioner{}
 }
 
-// BumpVersion increments the project version using semantic-release.
-// The process includes:
-// 1. Setting up a container with semantic-release
-// 2. Running semantic-release to determine the next version
-// 3. Updating the package version
-//
+// BumpVersion increments the version of a module based on the commit type
 // Parameters:
 // - ctx: The context for the operation
-// - source: The source directory containing the project
+// - source: The source directory containing the module
+// - module: The name of the module (e.g., "python-poetry")
+// - commitType: The type of commit (feat, fix, etc.)
 //
 // Returns:
-// - string: The new version number
-// - error: Any error that occurred during the versioning process
-func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
-	client := dagger.Connect()
-
-	// Setup Node.js container with required tools
-	container := client.Container().
-		From("node:lts-slim").
+// - string: The new version tag
+// - error: Any error that occurred during the process
+func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, module, commitType string) (string, error) {
+	container := dag.Container().
+		From("alpine:latest").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
-		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
-		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com")
+		WithExec([]string{"apk", "add", "--no-cache", "git"})
 
-	// Install required packages
-	container = container.
-		WithExec([]string{"apt-get", "update"}).
-		WithExec([]string{"apt-get", "install", "-y", "git", "openssh-client"})
-
-	// Install semantic-release and plugins
-	container = container.WithExec([]string{
-		"npm", "install", "-g",
-		"semantic-release",
-		"@semantic-release/commit-analyzer",
-		"@semantic-release/release-notes-generator",
-		"@semantic-release/changelog",
-		"@semantic-release/git",
-		"@semantic-release/github",
-	})
-
-	// Configure Git
-	container = container.
-		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
-		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
-
-	// Create package.json with semantic-release configuration
-	packageJSON := `{
-		"name": "@daggerverse/versioner",
-		"version": "0.0.0-development",
-		"private": true,
-		"release": {
-			"branches": ["main"],
-			"plugins": [
-				"@semantic-release/commit-analyzer",
-				"@semantic-release/release-notes-generator",
-				"@semantic-release/changelog",
-				["@semantic-release/git", {
-					"assets": ["CHANGELOG.md"],
-					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
-				}],
-				["@semantic-release/github", {
-					"assets": []
-				}]
-			]
-		}
-	}`
-
-	container = container.
-		WithExec([]string{"bash", "-c", fmt.Sprintf("echo '%s' > /src/package.json", packageJSON)})
-
-	// Run semantic-release
-	output, err := container.
-		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
-		WithEnvVariable("GH_TOKEN", os.Getenv("GITHUB_TOKEN")).
-		WithExec([]string{
-			"npx", "semantic-release",
-			"--branches", "main",
-			"--ci", "false",
-			"--debug",
-		}).Stdout(ctx)
-
+	// Get the latest tag for the module
+	output, err := container.WithExec([]string{
+		"sh", "-c",
+		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
+	}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error running semantic-release: %v", err)
+		return "", fmt.Errorf("error getting latest tag: %v", err)
 	}
 
-	// Extract version from output
-	version := strings.TrimSpace(output)
-	if version == "" {
-		return "", fmt.Errorf("no version found in semantic-release output")
+	var major, minor, patch int
+	if output == "" {
+		// No existing tag, start with v0.1.0
+		major, minor, patch = 0, 1, 0
+	} else {
+		// Parse existing version
+		version := strings.TrimPrefix(strings.TrimSpace(output), fmt.Sprintf("%s/v", module))
+		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
+		if err != nil {
+			return "", fmt.Errorf("error parsing version: %v", err)
+		}
+
+		// Increment version based on commit type
+		switch commitType {
+		case "feat":
+			minor++
+			patch = 0
+		case "fix", "perf":
+			patch++
+		case "BREAKING CHANGE":
+			major++
+			minor = 0
+			patch = 0
+		default:
+			patch++
+		}
 	}
 
-	return version, nil
+	// Format new version tag
+	newTag := fmt.Sprintf("%s/v%d.%d.%d", module, major, minor, patch)
+
+	// Create and push new tag
+	_, err = container.WithExec([]string{
+		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error creating tag: %v", err)
+	}
+
+	return newTag, nil
+}
+
+// GetCurrentVersion gets the current version of a module
+// Parameters:
+// - ctx: The context for the operation
+// - source: The source directory containing the module
+// - module: The name of the module
+//
+// Returns:
+// - string: The current version tag
+// - error: Any error that occurred during the process
+func (m *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
+	container := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"apk", "add", "--no-cache", "git"})
+
+	output, err := container.WithExec([]string{
+		"sh", "-c",
+		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting current version: %v", err)
+	}
+
+	return strings.TrimSpace(output), nil
 } 
