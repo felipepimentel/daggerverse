@@ -2,5 +2,15 @@
   "name": "python-pipeline",
   "engineVersion": "v0.15.1",
   "sdk": "go",
+  "dependencies": [
+    {
+      "name": "python-poetry",
+      "source": "../python-poetry"
+    },
+    {
+      "name": "python-pypi",
+      "source": "../python-pypi"
+    }
+  ],
   "source": "."
 }

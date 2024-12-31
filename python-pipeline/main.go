@@ -34,10 +34,10 @@ func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Dir
 	client := dagger.Connect()
 
 	// Get Poetry module
-	poetry := client.Container().Import("python-poetry")
+	poetry := dag.PythonPoetry()
 	
 	// Get PyPI module
-	pypi := client.Container().Import("python-pypi")
+	pypi := dag.PythonPypi()
 
 	// Install dependencies
 	installed, err := poetry.With(source).Install(ctx)
