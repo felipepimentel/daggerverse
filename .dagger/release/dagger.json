@@ -1,6 +1,6 @@
 {
   "name": "release",
-  "sdk": "go",
   "engineVersion": "v0.15.1",
-  "dependencies": []
+  "sdk": "go",
+  "source": "."
 }

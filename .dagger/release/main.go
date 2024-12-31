@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dagger.io/dagger"
-	"dagger.io/dagger/dag"
+	"dagger/release/internal/dagger"
 )
 
 // Release handles the CI/CD pipeline for all modules
@@ -18,26 +17,13 @@ func New() *Release {
 }
 
 // Run executes the release pipeline for all modules
-// The process includes:
-// 1. Analyzing commit messages
-// 2. Bumping versions based on semantic versioning rules
-// 3. Creating and pushing tags
-// 4. Publishing modules to Daggerverse
-//
-// Parameters:
-// - ctx: The context for the operation
-//
-// Returns:
-// - error: Any error that occurred during the process
-func (m *Release) Run(ctx context.Context) error {
+func (m *Release) Run(ctx context.Context, source *dagger.Directory) error {
 	// Setup Git container
 	container := dag.Container().
 		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"})
-
-	// Get source directory
-	source := dag.Host().Directory(".")
-	container = container.WithDirectory("/src", source).WithWorkdir("/src")
 
 	// Get the last commit message
 	commitMsg, err := container.WithExec([]string{
