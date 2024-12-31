@@ -5,11 +5,11 @@
   "dependencies": [
     {
       "name": "python-poetry",
-      "source": "../python-poetry"
+      "source": "github.com/felipepimentel/daggerverse/python-poetry"
     },
     {
       "name": "python-pypi",
-      "source": "../python-pypi"
+      "source": "github.com/felipepimentel/daggerverse/python-pypi"
     }
   ],
   "source": "."

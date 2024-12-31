@@ -5,15 +5,15 @@ import (
 	"context"
 	"fmt"
 
-	"dagger/python-pipeline/internal/dagger"
+	"dagger.io/dagger"
 )
 
 // PythonPipeline orchestrates Python project workflows using Poetry and PyPI.
 type PythonPipeline struct{}
 
 // New creates a new instance of PythonPipeline.
-func New(ctx context.Context) (*PythonPipeline, error) {
-	return &PythonPipeline{}, nil
+func New() *PythonPipeline {
+	return &PythonPipeline{}
 }
 
 // BuildAndPublish builds a Python package and publishes it to PyPI.
@@ -31,35 +31,28 @@ func New(ctx context.Context) (*PythonPipeline, error) {
 // Returns:
 // - error: Any error that occurred during the process
 func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
-	client := dagger.Connect()
-
-	// Get Poetry module
-	poetry := dag.PythonPoetry()
-	
-	// Get PyPI module
-	pypi := dag.PythonPypi()
+	// Setup Python container with Poetry
+	container := dag.Container().
+		From("python:3.11-slim").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
 
 	// Install dependencies
-	installed, err := poetry.With(source).Install(ctx)
-	if err != nil {
-		return fmt.Errorf("error installing dependencies: %v", err)
-	}
+	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
 	// Run tests
-	testOutput, err := poetry.With(installed).Test(ctx)
+	_, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error running tests: %v", err)
 	}
-	fmt.Println("Test output:", testOutput)
 
 	// Build package
-	built, err := poetry.With(installed).Build(ctx)
-	if err != nil {
-		return fmt.Errorf("error building package: %v", err)
-	}
+	container = container.WithExec([]string{"poetry", "build"})
 
-	// Publish to PyPI
-	err = pypi.With(built).WithSecret("PYPI_TOKEN", token).Publish(ctx)
+	// Configure PyPI credentials and publish
+	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+	_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error publishing to PyPI: %v", err)
 	}
@@ -76,22 +69,16 @@ func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Dir
 // - *dagger.Directory: The directory with updated dependencies
 // - error: Any error that occurred during the update
 func (m *PythonPipeline) UpdateDependencies(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-	client := dagger.Connect()
-
-	// Get Poetry module
-	poetry := client.Container().Import("python-poetry")
+	// Setup Python container with Poetry
+	container := dag.Container().
+		From("python:3.11-slim").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
 
 	// Update dependencies
-	updated, err := poetry.With(source).Update(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error updating dependencies: %v", err)
-	}
+	container = container.WithExec([]string{"poetry", "update", "--no-interaction"})
 
-	// Update lock file
-	locked, err := poetry.With(updated).Lock(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error updating lock file: %v", err)
-	}
-
-	return locked, nil
+	// Export the updated directory
+	return container.Directory("/src"), nil
 } 
