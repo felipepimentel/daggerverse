@@ -78,3 +78,6 @@
 
 # Go workspace file
 go.work
+.env
+dagger.gen.go
+

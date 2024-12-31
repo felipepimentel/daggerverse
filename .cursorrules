@@ -13,214 +13,164 @@ type(scope): subject
 ## Types
 
 - `feat`: A new feature (minor version)
-  - New functionality in module APIs
-  - New configuration options
-  - New tools or integrations
+  - New functionality in reusable modules
+  - New integrations with Dagger
+  - Enhancements to CI/CD logic in `.dagger/`
 - `fix`: A bug fix (patch version)
-  - Bug fixes in module functionality
-  - Corrections in configuration handling
-  - Environment variable fixes
+  - Fixes in module logic
+  - Corrections in auto-generated configurations
+  - Workflow or script fixes
 - `perf`: A code change that improves performance (patch version)
-  - Cache optimizations
-  - Build speed improvements
-  - Resource usage optimizations
+  - Optimizations in reusable modules
+  - Workflow performance improvements
+  - Build efficiency updates
 - `docs`: Documentation only changes (patch version)
-  - README updates
-  - Code comments
-  - Module documentation
-- `style`: Changes that do not affect the meaning of the code
-  - Formatting
-  - White-space
-  - Missing semi-colons
-- `refactor`: A code change that neither fixes a bug nor adds a feature
-  - Code reorganization
-  - Renaming
-  - Moving files
-- `test`: Adding missing tests or correcting existing tests
-  - Unit tests
-  - Integration tests
-  - Test configuration
-- `build`: Changes that affect the build system or external dependencies
-  - Dagger configuration
-  - Dependencies updates
-  - Build process changes
-- `ci`: Changes to our CI configuration files and scripts
-  - GitHub Actions workflows
-  - Release configuration
-  - CI/CD pipeline changes
-- `chore`: Other changes that don't modify src or test files
-  - Maintenance tasks
-  - Cleanup activities
+  - Updates to README or module-specific documentation
+  - Comments explaining module behaviors
+  - Changes in documentation for `.dagger/` workflows
+- `style`: Non-functional changes to code style
+  - Formatting adjustments
+  - Linting fixes
+  - Naming conventions
+- `refactor`: Code changes without feature addition or bug fix
+  - Module structure reorganization
+  - Internal logic improvements
+  - Redundant code removal
+- `test`: Adding or fixing tests
+  - Unit tests for modules
+  - Workflow tests
+  - Integration tests for Dagger pipelines
+- `build`: Changes in build configuration or dependencies
+  - Updates to `go.mod` or `go.sum`
+  - Adjustments in Dagger development setup
+  - Build script modifications
+- `ci`: Updates to CI/CD configuration
+  - Workflow improvements in `.dagger/`
+  - GitHub Actions configurations
+  - Release process updates
+- `chore`: Repository maintenance or minor updates
+  - Cleanup tasks
   - Administrative changes
+  - Dependency updates without code modifications
 
 ## Scopes
 
-- `python`: Changes to the Python module
-  - Poetry integration
-  - PyPI publishing
-  - Testing framework
-  - Documentation tools
-- `nodejs`: Changes to the Node.js module
-  - npm integration
-  - Package publishing
-  - Testing setup
-- `ruby`: Changes to the Ruby module
-  - Bundler integration
-  - Gem publishing
-  - Testing configuration
+- `go`: Changes to reusable Go modules
+  - New module creation
+  - Refactoring of existing modules
+  - Optimizations and bug fixes
+- `dagger`: Changes to Dagger workflows and configurations
+  - Updates in `.dagger/`
+  - CI/CD logic refinements
+  - Workflow automation enhancements
+- `internal`: Internal auto-generated components
+  - Handling of `dagger.gen.go`
+  - Updates to files in `internal/` (only regenerated via `dagger develop`)
 - `global`: Repository-wide changes
-  - CI/CD workflows
-  - Documentation standards
-  - Common configurations
+  - Updates impacting multiple modules
+  - Adjustments to project structure
+  - Common configurations or standards
+
+## Protected Files and Directories
+
+- **`internal/`**: Auto-generated directory. Do not modify files inside this directory manually. Regenerate it using `dagger develop` when changes are required.
+- **`dagger.gen.go`**: Auto-generated file. Any modifications must be done by rerunning `dagger develop`. Direct edits are prohibited.
 
 ## Breaking Changes
 
-Breaking changes must be indicated by:
+Breaking changes must follow these guidelines:
 
-1. `!` after the type/scope
-2. `BREAKING CHANGE:` in the footer
+1. Add `!` after the type/scope in the commit header.
+2. Include a `BREAKING CHANGE:` section in the commit footer.
+3. Provide a clear explanation of the change, its impact, and migration instructions.
 
 Example:
 
 ```
-feat(python)!: change module API interface
+feat(dagger)!: update Dagger workflow API
 
-BREAKING CHANGE: The BuildConfig interface now requires explicit cache configuration.
-Previous cache configuration will need to be updated to use the new CacheConfig struct.
-
-Migration guide:
-- Replace cache boolean flags with CacheConfig struct
-- Update cache volume names if custom ones were used
-- Review cache mounting points in custom configurations
-```
-
-## Examples
-
-### Features
-
-```
-feat(python): add support for custom test runners
-- Add TestConfig struct for configuration
-- Implement parallel test execution
-- Add coverage reporting options
-- Support test markers and paths
-
-feat(python): implement documentation generation
-- Add Sphinx and MkDocs support
-- Configure multiple output formats
-- Enable theme customization
-- Support various documentation extensions
-```
-
-### Bug Fixes
-
-```
-fix(python): resolve PyPI token handling
-- Update token environment variable format
-- Add validation for token presence
-- Improve error messages for missing tokens
-
-fix(global): correct environment variable syntax
-- Replace process.env with env in configs
-- Update variable references in workflows
-- Fix path handling in release process
-```
-
-### Documentation
-
-```
-docs(python): improve API documentation
-- Add usage examples for all features
-- Document configuration options
-- Include troubleshooting guide
-- Add migration instructions
-
-docs(global): update project guidelines
-- Clarify commit message format
-- Add scope definitions
-- Include breaking change examples
-- Document release process
+BREAKING CHANGE: The workflow structure now requires a `dagger.yml` configuration.
+Ensure all workflows include this file in the root of `.dagger/` before running pipelines.
 ```
 
 ## Rules
 
-1. Subject line:
+### Commit Messages
 
-   - Must be in present tense
-   - Must not end with a period
-   - Must be 72 characters or less
-   - Must start with lowercase
-   - Should be clear and descriptive
-   - Should complete the sentence "This commit will..."
+1. **Subject Line:**
 
-2. Body:
+   - Use the present tense (e.g., "Add feature", not "Added feature").
+   - Keep it concise (72 characters or fewer).
+   - Avoid ending with a period.
+   - Ensure it is descriptive and follows the format: `type(scope): subject`.
 
-   - Must have a blank line after subject
-   - Each line must be 72 characters or less
-   - Should explain what and why, not how
-   - Use bullet points for multiple items
-   - Include context when necessary
-   - Reference issues and PRs when relevant
+2. **Body:**
 
-3. Breaking Changes:
+   - Provide context when necessary.
+   - Explain _what_ and _why_, not _how_.
+   - Use bullet points for multiple changes or detailed descriptions.
 
-   - Must include both `!` and `BREAKING CHANGE:` footer
-   - Must describe the breaking change in detail
-   - Must provide migration instructions
-   - Should explain the reason for the change
-   - Include examples of before and after
-   - List all affected components
+3. **Breaking Changes:**
+   - Explicitly mark with `!` and `BREAKING CHANGE:`.
+   - Provide a migration guide if applicable.
 
-4. Scope:
-   - Must be one of the defined scopes
-   - Must be lowercase
-   - Must be in parentheses
-   - Should be as specific as possible
-   - Use 'global' for repository-wide changes
-   - Match the module being modified
+### Tagging
 
-## Automatic Versioning
-
-Commits will trigger version updates based on:
-
-- `feat(python)`: Minor version (1.1.0)
-  - New features
-  - New configuration options
-  - New integrations
-- `fix(python)`: Patch version (1.0.1)
-  - Bug fixes
-  - Security updates
-  - Performance improvements
-- `perf(python)`: Patch version (1.0.1)
-  - Optimizations
-  - Performance fixes
-- `docs(python)`: Patch version (1.0.1)
-  - Documentation updates
-  - Example additions
-- Breaking change: Major version (2.0.0)
-  - API changes
-  - Behavior changes
-  - Configuration format changes
-
-## Tag Format
-
-Tags will be generated in the format:
+Tags should follow this format:
 
 ```
 <module>/v<version>
 Examples:
-- python/v1.2.3
-- nodejs/v0.1.0
-- ruby/v2.0.0
+- go/v1.0.0
+- dagger/v0.2.1
 ```
 
-## Changelog Management
+### Automatic Versioning
 
-The CHANGELOG.md file:
+- **`feat`:** Increments minor version (e.g., 1.1.0).
+- **`fix` or `perf`:** Increments patch version (e.g., 1.0.1).
+- **Breaking changes:** Increments major version (e.g., 2.0.0).
 
-- Is automatically updated
-- Uses Keep a Changelog format
-- Groups changes by type
-- Includes version numbers
-- Links to relevant issues/PRs
-- Documents breaking changes
+### Changelog Management
+
+- Use the [Keep a Changelog](https://keepachangelog.com/) format.
+- Group changes by type and scope.
+- Link to relevant issues/PRs for context.
+- Highlight breaking changes in a dedicated section.
+
+### File and Directory Management
+
+1. **Project Structure:**
+
+   - Each reusable module must reside in its own directory under the root.
+   - CI/CD workflows should be defined entirely within `.dagger/`.
+
+2. **Protected Components:**
+
+   - **Do not manually edit** `dagger.gen.go` or files in `internal/`.
+   - Regenerate these files using `dagger develop` as necessary.
+
+3. **Directory Responsibilities:**
+   - **`.dagger/`:** Primary location for workflow logic and automation scripts.
+   - **`.github/`:** Reserved for GitHub Actions configurations that reference `.dagger/`.
+
+### Code Quality
+
+1. **Go Code:**
+
+   - Follow idiomatic Go practices.
+   - Ensure all changes pass linting and formatting checks.
+   - Write unit tests for all new or modified functionality.
+   - **Import Dagger modules correctly:** Always use the import path `dagger/<module>/internal/dagger` instead of `dagger.io/dagger`.
+   - **Module Naming Convention:** Ensure the `module` directive in `go.mod` follows the format `module dagger/<module_name>` instead of `module github.com/felipepimentel/daggerverse/<module_name>`.
+
+2. **Dagger Workflows:**
+
+   - Keep workflows modular and reusable.
+   - Ensure pipelines are well-documented and tested.
+   - **Version Requirements:** Ensure the Dagger version is `0.15.1` and Go version is `1.23.2`. Validate this in all configurations.
+
+3. **Documentation:**
+   - Update README and module-specific documentation as necessary.
+   - Clearly explain the purpose and usage of all modules and workflows.
+   - Highlight the correct import paths, module naming conventions, and required versions for Go and Dagger.

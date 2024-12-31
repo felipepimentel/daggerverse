@@ -1,5 +1,5 @@
 {
-  "name": "python-builder",
+  "name": "versioner",
   "engineVersion": "v0.15.1",
   "sdk": "go",
   "source": "."

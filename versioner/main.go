@@ -1,6 +1,5 @@
-// Package main provides functionality for semantic versioning of Python projects.
-// It uses semantic-release to automatically determine the next version number
-// based on commit messages and updates the project's version accordingly.
+// Package main provides functionality for semantic versioning of projects.
+// It uses semantic-release for version management.
 package main
 
 import (
@@ -9,37 +8,33 @@ import (
 	"os"
 	"strings"
 
-	"dagger.io/dagger"
+	"dagger/versioner/internal/dagger"
 )
 
-// PythonVersioner handles semantic versioning for Python projects.
+// Versioner handles semantic versioning for projects.
 // It uses semantic-release to analyze commit messages and determine version bumps.
-type PythonVersioner struct{}
+type Versioner struct{}
+
+// New creates a new instance of Versioner.
+func New(ctx context.Context) (*Versioner, error) {
+	return &Versioner{}, nil
+}
 
 // BumpVersion increments the project version using semantic-release.
 // The process includes:
-// 1. Setting up a Node.js container with required tools
-// 2. Installing semantic-release and plugins
-// 3. Configuring Git for commit operations
-// 4. Creating a package.json with semantic-release configuration
-// 5. Running semantic-release to determine and apply version bump
-//
-// Required environment variables:
-// - GITHUB_TOKEN: GitHub token for semantic-release operations
+// 1. Setting up a container with semantic-release
+// 2. Running semantic-release to determine the next version
+// 3. Updating the package version
 //
 // Parameters:
 // - ctx: The context for the operation
-// - source: The source directory containing the Python project
+// - source: The source directory containing the project
 //
 // Returns:
 // - string: The new version number
 // - error: Any error that occurred during the versioning process
-func (m *PythonVersioner) BumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error connecting to dagger: %v", err)
-	}
-	defer client.Close()
+func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (string, error) {
+	client := dagger.Connect()
 
 	// Setup Node.js container with required tools
 	container := client.Container().
@@ -74,7 +69,7 @@ func (m *PythonVersioner) BumpVersion(ctx context.Context, source *dagger.Direct
 
 	// Create package.json with semantic-release configuration
 	packageJSON := `{
-		"name": "@daggerverse/python",
+		"name": "@daggerverse/versioner",
 		"version": "0.0.0-development",
 		"private": true,
 		"release": {

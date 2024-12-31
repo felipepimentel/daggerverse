@@ -1,118 +1,97 @@
+// Package main provides a complete pipeline for Python projects using Poetry and PyPI.
 package main
 
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"dagger.io/dagger"
+	"dagger/python-pipeline/internal/dagger"
 )
 
-type PythonPipeline struct {
-	PackagePath string // Caminho para o pacote Python dentro do source
+// PythonPipeline orchestrates Python project workflows using Poetry and PyPI.
+type PythonPipeline struct{}
+
+// New creates a new instance of PythonPipeline.
+func New(ctx context.Context) (*PythonPipeline, error) {
+	return &PythonPipeline{}, nil
 }
 
-// CICD executa o pipeline completo de CI/CD
-func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	client, err := dagger.Connect(ctx)
+// BuildAndPublish builds a Python package and publishes it to PyPI.
+// The process includes:
+// 1. Installing dependencies with Poetry
+// 2. Running tests
+// 3. Building the package
+// 4. Publishing to PyPI
+//
+// Parameters:
+// - ctx: The context for the operation
+// - source: The source directory containing the Python project
+// - token: The PyPI authentication token
+//
+// Returns:
+// - error: Any error that occurred during the process
+func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+	client := dagger.Connect()
+
+	// Get Poetry module
+	poetry := client.Container().Import("github.com/felipepimentel/daggerverse/python-poetry")
+	
+	// Get PyPI module
+	pypi := client.Container().Import("github.com/felipepimentel/daggerverse/python-pypi")
+
+	// Install dependencies
+	installed, err := poetry.With(source).Install(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error connecting to dagger: %v", err)
-	}
-	defer client.Close()
-
-	// Build e teste
-	builder := client.Container().
-		From("python:3.11-slim").
-		WithDirectory("/src", source).
-		WithWorkdir("/src/" + m.PackagePath).
-		WithExec([]string{"pip", "install", "poetry"}).
-		WithExec([]string{"poetry", "install", "--no-interaction"}).
-		WithExec([]string{"poetry", "run", "pytest"}).
-		WithExec([]string{"poetry", "build"})
-
-	if _, err := builder.Sync(ctx); err != nil {
-		return "", fmt.Errorf("error building package: %v", err)
+		return fmt.Errorf("error installing dependencies: %v", err)
 	}
 
-	// Bump version
-	versioner := client.Container().
-		From("node:lts-slim").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
-		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com").
-		WithExec([]string{"apt-get", "update"}).
-		WithExec([]string{"apt-get", "install", "-y", "git", "openssh-client"}).
-		WithExec([]string{
-			"npm", "install", "-g",
-			"semantic-release",
-			"@semantic-release/commit-analyzer",
-			"@semantic-release/release-notes-generator",
-			"@semantic-release/changelog",
-			"@semantic-release/git",
-			"@semantic-release/github",
-		}).
-		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
-		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
-
-	// Criar package.json
-	packageJSON := `{
-		"name": "@daggerverse/python",
-		"version": "0.0.0-development",
-		"private": true,
-		"release": {
-			"branches": ["main"],
-			"plugins": [
-				"@semantic-release/commit-analyzer",
-				"@semantic-release/release-notes-generator",
-				"@semantic-release/changelog",
-				["@semantic-release/git", {
-					"assets": ["CHANGELOG.md"],
-					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
-				}],
-				["@semantic-release/github", {
-					"assets": []
-				}]
-			]
-		}
-	}`
-
-	versioner = versioner.
-		WithExec([]string{"bash", "-c", fmt.Sprintf("echo '%s' > /src/package.json", packageJSON)})
-
-	versionOutput, err := versioner.
-		WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN")).
-		WithEnvVariable("GH_TOKEN", os.Getenv("GITHUB_TOKEN")).
-		WithExec([]string{
-			"npx", "semantic-release",
-			"--branches", "main",
-			"--ci", "false",
-			"--debug",
-		}).Stdout(ctx)
-
+	// Run tests
+	testOutput, err := poetry.With(installed).Test(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error bumping version: %v", err)
+		return fmt.Errorf("error running tests: %v", err)
 	}
+	fmt.Println("Test output:", testOutput)
 
-	// Publicar no PyPI
-	tokenValue, err := token.Plaintext(ctx)
+	// Build package
+	built, err := poetry.With(installed).Build(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error getting token value: %v", err)
+		return fmt.Errorf("error building package: %v", err)
 	}
 
-	publisher := client.Container().
-		From("python:3.11-slim").
-		WithDirectory("/src", source).
-		WithWorkdir("/src/" + m.PackagePath).
-		WithExec([]string{"pip", "install", "poetry"}).
-		WithExec([]string{"poetry", "config", "pypi-token.pypi", tokenValue}).
-		WithExec([]string{"poetry", "publish", "--build"})
-
-	if _, err := publisher.Sync(ctx); err != nil {
-		return "", fmt.Errorf("error publishing package: %v", err)
+	// Publish to PyPI
+	err = pypi.With(built).WithSecret("PYPI_TOKEN", token).Publish(ctx)
+	if err != nil {
+		return fmt.Errorf("error publishing to PyPI: %v", err)
 	}
 
-	return versionOutput, nil
+	return nil
+}
+
+// UpdateDependencies updates project dependencies and lock file.
+// Parameters:
+// - ctx: The context for the operation
+// - source: The source directory containing the Python project
+//
+// Returns:
+// - *dagger.Directory: The directory with updated dependencies
+// - error: Any error that occurred during the update
+func (m *PythonPipeline) UpdateDependencies(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+	client := dagger.Connect()
+
+	// Get Poetry module
+	poetry := client.Container().Import("github.com/felipepimentel/daggerverse/python-poetry")
+
+	// Update dependencies
+	updated, err := poetry.With(source).Update(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error updating dependencies: %v", err)
+	}
+
+	// Update lock file
+	locked, err := poetry.With(updated).Lock(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error updating lock file: %v", err)
+	}
+
+	return locked, nil
 } 

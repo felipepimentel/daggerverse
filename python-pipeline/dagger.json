@@ -1,18 +1,6 @@
 {
   "name": "python-pipeline",
+  "engineVersion": "v0.15.1",
   "sdk": "go",
-  "dependencies": [
-    {
-      "name": "python-builder",
-      "source": "../python-builder"
-    },
-    {
-      "name": "python-publisher",
-      "source": "../python-publisher"
-    },
-    {
-      "name": "python-versioner",
-      "source": "../python-versioner"
-    }
-  ]
+  "source": "."
 }

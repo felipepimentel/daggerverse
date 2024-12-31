@@ -1,5 +1,5 @@
 {
-  "name": "python-versioner",
+  "name": "python-pypi",
   "engineVersion": "v0.15.1",
   "sdk": "go",
   "source": "."
