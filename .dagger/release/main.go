@@ -17,13 +17,22 @@ func New() *Release {
 }
 
 // Run executes the release pipeline for all modules
-func (m *Release) Run(ctx context.Context, source *dagger.Directory) error {
+func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Setup Git container
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
-		WithExec([]string{"apk", "add", "--no-cache", "git"})
+		WithExec([]string{"apk", "add", "--no-cache", "git", "openssh"}).
+		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
+		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
+		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
+		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com")
+
+	// Configure Git with token
+	container = container.WithExec([]string{
+		"git", "config", "--global", "url.https://oauth2:token@github.com/.insteadOf", "https://github.com/",
+	}).WithSecretVariable("token", token)
 
 	// Get the last commit message
 	commitMsg, err := container.WithExec([]string{
