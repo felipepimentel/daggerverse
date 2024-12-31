@@ -34,10 +34,10 @@ func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Dir
 	client := dagger.Connect()
 
 	// Get Poetry module
-	poetry := client.Container().Import("github.com/felipepimentel/daggerverse/python-poetry")
+	poetry := client.Container().Import("python-poetry")
 	
 	// Get PyPI module
-	pypi := client.Container().Import("github.com/felipepimentel/daggerverse/python-pypi")
+	pypi := client.Container().Import("python-pypi")
 
 	// Install dependencies
 	installed, err := poetry.With(source).Install(ctx)
@@ -79,7 +79,7 @@ func (m *PythonPipeline) UpdateDependencies(ctx context.Context, source *dagger.
 	client := dagger.Connect()
 
 	// Get Poetry module
-	poetry := client.Container().Import("github.com/felipepimentel/daggerverse/python-poetry")
+	poetry := client.Container().Import("python-poetry")
 
 	// Update dependencies
 	updated, err := poetry.With(source).Update(ctx)
