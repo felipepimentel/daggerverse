@@ -157,33 +157,27 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		"git", "tag", "-d", tagName,
 	})
 
-	// Create a temporary tag first
-	tempTagName := strings.ReplaceAll(tagName, "/", "_")
+	// Create the tag
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-a", tempTagName, "-m", commitMsg, hash,
+		"git", "tag", "-a", tagName, "-m", commitMsg, hash,
 	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error creating temporary tag: %v", err)
+		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Verify the temporary tag exists
+	// Pack refs to ensure tag is visible
+	if _, err := container.WithExec([]string{
+		"git", "pack-refs", "--all",
+	}).Stdout(ctx); err != nil {
+		return fmt.Errorf("error packing refs: %v", err)
+	}
+
+	// Verify the tag exists
 	output, err := container.WithExec([]string{
-		"git", "tag", "-l", tempTagName,
+		"git", "tag", "-l", tagName,
 	}).Stdout(ctx)
-	if err != nil || !strings.Contains(output, tempTagName) {
-		return fmt.Errorf("temporary tag %s was not created successfully", tempTagName)
+	if err != nil || !strings.Contains(output, tagName) {
+		return fmt.Errorf("tag %s was not created successfully", tagName)
 	}
-
-	// Rename the temporary tag to the final name
-	if _, err := container.WithExec([]string{
-		"git", "tag", "-a", tagName, "-m", commitMsg, hash, "-f",
-	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error creating final tag: %v", err)
-	}
-
-	// Delete the temporary tag
-	container.WithExec([]string{
-		"git", "tag", "-d", tempTagName,
-	})
 
 	// Push the tag with force to update any existing remote tag
 	if _, err := container.WithExec([]string{
