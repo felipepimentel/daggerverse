@@ -1,33 +1,83 @@
-# ci.yml
-name: CI/CD
+name: Release
 
 on:
   push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 permissions:
   contents: write
-  id-token: write
-  issues: read
-  pull-requests: read
+  issues: write
+  pull-requests: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run Release Pipeline
-        uses: dagger/dagger-for-github@v7
+      - id: set-matrix
+        run: |
+          MODULES=$(find . -name "dagger.json" -exec dirname {} \; | sed 's|^./||' | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=${MODULES}" >> $GITHUB_OUTPUT
+
+  release:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.matrix != '[]' }}
+    strategy:
+      matrix:
+        module: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+
+    name: Release ${{ matrix.module }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          verb: call
-          args: run --source . --token env:GITHUB_TOKEN
-          module: ./.dagger/release
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install dependencies
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODULE_PATH: ${{ matrix.module }}
+          MODULE_NAME: ${{ matrix.module }}
+        run: |
+          echo "MODULE_NAME=${{ matrix.module }}" >> $GITHUB_ENV
+          echo "MODULE_PATH=${{ matrix.module }}" >> $GITHUB_ENV
+          npx semantic-release
+
+      - name: Setup Dagger
+        uses: dagger/dagger-for-github@v7
+        with:
+          version: "latest"
+          workdir: ${{ matrix.module }}
+
+      - name: Get Latest Tag
+        id: get-tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 --match "${{ matrix.module }}/v*" || echo "")
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Publish to Daggerverse
+        if: steps.get-tag.outputs.tag != ''
+        working-directory: ${{ matrix.module }}
+        run: dagger publish
