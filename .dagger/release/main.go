@@ -45,6 +45,21 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		"git", "config", "--global", "url.https://oauth2:token@github.com/.insteadOf", "https://github.com/",
 	}).WithSecretVariable("token", token)
 
+	// Initialize Git repository
+	container = container.WithExec([]string{"git", "init"})
+
+	// Add remote and fetch
+	container = container.WithExec([]string{
+		"sh", "-c",
+		`git remote add origin https://github.com/felipepimentel/daggerverse.git && git fetch --tags --force`,
+	})
+
+	// Configure Git branch
+	container = container.WithExec([]string{
+		"sh", "-c",
+		`git checkout -b temp && git reset --hard origin/main`,
+	})
+
 	// Get the last commit message
 	commitMsg, err := container.WithExec([]string{
 		"git", "log", "-1", "--pretty=%B",
@@ -53,7 +68,7 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		return fmt.Errorf("error getting commit message: %v", err)
 	}
 
-	// Process each module in parallel
+	// Process each module
 	for _, module := range modules {
 		moduleContainer := container.WithWorkdir(filepath.Join("/src", module))
 		
