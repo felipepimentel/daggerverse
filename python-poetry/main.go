@@ -9,11 +9,28 @@ import (
 )
 
 // PythonPoetry handles Python project management with Poetry.
-type PythonPoetry struct{}
+type PythonPoetry struct {
+	// Add base container configuration
+	baseImage string
+	client    *dagger.Client
+}
 
 // New creates a new instance of PythonPoetry.
 func New(ctx context.Context) (*PythonPoetry, error) {
-	return &PythonPoetry{}, nil
+	client := dagger.Connect()
+	return &PythonPoetry{
+		baseImage: "python:3.12-alpine",
+		client:    client,
+	}, nil
+}
+
+// getBaseContainer returns a configured base container with Poetry installed
+func (m *PythonPoetry) getBaseContainer(source *dagger.Directory) *dagger.Container {
+	return m.client.Container().
+		From(m.baseImage).
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
 }
 
 // Install installs project dependencies using Poetry.
@@ -24,13 +41,7 @@ func New(ctx context.Context) (*PythonPoetry, error) {
 // - *dagger.Directory: The directory with installed dependencies
 // - error: Any error that occurred during installation
 func (m *PythonPoetry) Install(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-	client := dagger.Connect()
-
-	container := client.Container().
-		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
 		WithExec([]string{"poetry", "install", "--no-interaction"})
 
@@ -45,13 +56,7 @@ func (m *PythonPoetry) Install(ctx context.Context, source *dagger.Directory) (*
 // - *dagger.Directory: The directory containing the built package
 // - error: Any error that occurred during build
 func (m *PythonPoetry) Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-	client := dagger.Connect()
-
-	container := client.Container().
-		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "build"})
 
 	return container.Directory("/src/dist"), nil
@@ -65,13 +70,7 @@ func (m *PythonPoetry) Build(ctx context.Context, source *dagger.Directory) (*da
 // - string: The test output
 // - error: Any error that occurred during testing
 func (m *PythonPoetry) Test(ctx context.Context, source *dagger.Directory) (string, error) {
-	client := dagger.Connect()
-
-	container := client.Container().
-		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
 		WithExec([]string{"poetry", "install", "--no-interaction"})
 
@@ -91,13 +90,7 @@ func (m *PythonPoetry) Test(ctx context.Context, source *dagger.Directory) (stri
 // - *dagger.Directory: The directory containing the updated lock file
 // - error: Any error that occurred during lock update
 func (m *PythonPoetry) Lock(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-	client := dagger.Connect()
-
-	container := client.Container().
-		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "lock", "--no-update"})
 
 	return container.Directory("/src"), nil
@@ -111,14 +104,8 @@ func (m *PythonPoetry) Lock(ctx context.Context, source *dagger.Directory) (*dag
 // - *dagger.Directory: The directory with updated dependencies
 // - error: Any error that occurred during update
 func (m *PythonPoetry) Update(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-	client := dagger.Connect()
-
-	container := client.Container().
-		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "update"})
 
 	return container.Directory("/src"), nil
-} 
+}
