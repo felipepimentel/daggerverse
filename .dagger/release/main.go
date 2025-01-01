@@ -134,6 +134,11 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
+	// Sync the local repository state to ensure tag visibility
+	container = container.WithExec([]string{
+		"git", "fetch", "--tags",
+	})
+
 	// Validate if the tag exists
 	tagExists, err := container.WithExec([]string{
 		"git", "tag", "--list", tagName,
