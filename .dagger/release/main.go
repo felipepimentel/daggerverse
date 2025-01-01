@@ -151,23 +151,24 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 	}
 	hash = strings.TrimSpace(hash)
 
+	// Delete the tag if it exists (both locally and remotely)
+	container.WithExec([]string{
+		"git", "tag", "-d", tagName,
+	})
+	container.WithExec([]string{
+		"git", "push", "origin", ":refs/tags/" + tagName,
+	})
+
 	// Create an annotated tag
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-f", "-a", tagName, "-m", commitMsg,
+		"git", "tag", "-a", tagName, "-m", commitMsg,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// List tags to verify
+	// Push using --tags flag
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-l", tagName,
-	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error listing tags: %v", err)
-	}
-
-	// Push the tag to the remote repository with refs/tags prefix
-	if _, err := container.WithExec([]string{
-		"git", "push", "-f", "origin", "refs/tags/" + tagName,
+		"git", "push", "--tags", "origin",
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
