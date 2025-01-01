@@ -132,9 +132,10 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		"git", "config", "--global", "url.https://github.com/.insteadOf", "git@github.com:",
 	})
 
-	// Set up credentials for HTTPS
+	// Set up credentials for HTTPS using token directly in the URL
 	container = container.WithExec([]string{
-		"git", "config", "--global", "http.https://github.com/.extraheader", "AUTHORIZATION: basic ${token}",
+		"git", "remote", "set-url", "origin",
+		"https://${token}@github.com/felipepimentel/daggerverse.git",
 	})
 
 	// Make sure we're on the main branch and up to date
@@ -166,9 +167,9 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Push using --tags flag
+	// Push the tag explicitly
 	if _, err := container.WithExec([]string{
-		"git", "push", "--tags", "origin",
+		"git", "push", "origin", tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
