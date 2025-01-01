@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/felipepimentel/daggerverse/compare/v1.7.1...v1.8.0) (2025-01-01)
+
+
+### Features
+
+* **python:** enhance CI/CD functionality and project structure detection ([4052cf9](https://github.com/felipepimentel/daggerverse/commit/4052cf983aaf7d13d92c0964457acd89c86bc97e))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
