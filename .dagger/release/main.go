@@ -127,29 +127,26 @@ func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) (
 
 // createAndPushTag creates and pushes a Git tag with the commit message
 func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
-	// Create the tag
+	// Configure Git to use HTTPS instead of SSH for pushing
+	container = container.WithExec([]string{
+		"git", "config", "--global", "url.https://github.com/.insteadOf", "git@github.com:",
+	})
+
+	// Set up credentials for HTTPS
+	container = container.WithExec([]string{
+		"git", "config", "--global", "http.https://github.com/.extraheader", "AUTHORIZATION: basic ${token}",
+	})
+
+	// Create the tag with force to ensure it's created even if it exists
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-a", tagName, "-m", commitMsg,
+		"git", "tag", "-f", "-a", tagName, "-m", commitMsg,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Sync the local repository state to ensure tag visibility
-	container = container.WithExec([]string{
-		"git", "fetch", "--tags",
-	})
-
-	// Validate if the tag exists
-	tagExists, err := container.WithExec([]string{
-		"git", "tag", "--list", tagName,
-	}).Stdout(ctx)
-	if err != nil || strings.TrimSpace(tagExists) != tagName {
-		return fmt.Errorf("tag %s does not exist after creation: %v", tagName, err)
-	}
-
-	// Push the tag to the remote repository
+	// Push the tag to the remote repository with force
 	if _, err := container.WithExec([]string{
-		"git", "push", "origin", tagName,
+		"git", "push", "-f", "origin", tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
