@@ -153,16 +153,23 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Verify the tag exists
+	// Update Git's packed refs to ensure the tag is visible
 	if _, err := container.WithExec([]string{
-		"git", "show-ref", "--tags", tagName,
+		"git", "pack-refs", "--all",
 	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error verifying tag: %v", err)
+		return fmt.Errorf("error packing refs: %v", err)
+	}
+
+	// List all tags to ensure Git's refs are up to date
+	if _, err := container.WithExec([]string{
+		"git", "tag", "-l",
+	}).Stdout(ctx); err != nil {
+		return fmt.Errorf("error listing tags: %v", err)
 	}
 
 	// Push the tag to the remote repository with force
 	if _, err := container.WithExec([]string{
-		"git", "push", "-f", "origin", "refs/tags/"+tagName,
+		"git", "push", "-f", "origin", tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
