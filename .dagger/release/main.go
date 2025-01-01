@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	dag "dagger.io/dagger"
+	"dagger/release/internal/dagger"
 )
 
 // Release handles the CI/CD pipeline for all modules
@@ -19,7 +19,7 @@ func New() *Release {
 }
 
 // Run executes the release pipeline for all modules
-func (m *Release) Run(ctx context.Context, source *dag.Directory, token *dag.Secret) error {
+func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Detect modules
 	modules, err := m.detectModules(ctx, source)
 	if err != nil {
@@ -99,7 +99,7 @@ func (m *Release) Run(ctx context.Context, source *dag.Directory, token *dag.Sec
 }
 
 // detectModules finds all Dagger modules in the repository
-func (m *Release) detectModules(ctx context.Context, source *dag.Directory) ([]string, error) {
+func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) ([]string, error) {
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -126,7 +126,7 @@ func (m *Release) detectModules(ctx context.Context, source *dag.Directory) ([]s
 }
 
 // createAndPushTag creates and pushes a Git tag with the commit message
-func (m *Release) createAndPushTag(ctx context.Context, container *dag.Container, tagName, commitMsg string) error {
+func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
 	if _, err := container.WithExec([]string{
 		"git", "tag", "-a", tagName, "-m", commitMsg,
 	}).Stdout(ctx); err != nil {
@@ -157,7 +157,7 @@ func (m *Release) getCommitType(msg string) string {
 }
 
 // getCurrentVersion gets the current version of a module
-func (m *Release) getCurrentVersion(ctx context.Context, container *dag.Container, module string) (string, error) {
+func (m *Release) getCurrentVersion(ctx context.Context, container *dagger.Container, module string) (string, error) {
 	output, err := container.WithExec([]string{
 		"sh", "-c",
 		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
