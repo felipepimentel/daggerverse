@@ -27,7 +27,7 @@ func (m *PythonPoetry) Install(ctx context.Context, source *dagger.Directory) (*
 	client := dagger.Connect()
 
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
@@ -48,7 +48,7 @@ func (m *PythonPoetry) Build(ctx context.Context, source *dagger.Directory) (*da
 	client := dagger.Connect()
 
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
@@ -68,7 +68,7 @@ func (m *PythonPoetry) Test(ctx context.Context, source *dagger.Directory) (stri
 	client := dagger.Connect()
 
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
@@ -94,7 +94,7 @@ func (m *PythonPoetry) Lock(ctx context.Context, source *dagger.Directory) (*dag
 	client := dagger.Connect()
 
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
@@ -114,7 +114,7 @@ func (m *PythonPoetry) Update(ctx context.Context, source *dagger.Directory) (*d
 	client := dagger.Connect()
 
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).

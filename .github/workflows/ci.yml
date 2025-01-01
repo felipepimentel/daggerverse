@@ -75,9 +75,11 @@ jobs:
         id: get-tag
         run: |
           TAG=$(git describe --tags --abbrev=0 --match "${{ matrix.module }}/v*" || echo "")
+          VERSION=${TAG#*/}  # Remove module name prefix to get just the version
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Publish to Daggerverse
         if: steps.get-tag.outputs.tag != ''
         working-directory: ${{ matrix.module }}
-        run: dagger publish
+        run: dagger publish --version ${{ steps.get-tag.outputs.version }}
