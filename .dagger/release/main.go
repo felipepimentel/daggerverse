@@ -127,12 +127,22 @@ func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) (
 
 // createAndPushTag creates and pushes a Git tag with the commit message
 func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
+	// Create the tag
 	if _, err := container.WithExec([]string{
 		"git", "tag", "-a", tagName, "-m", commitMsg,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
+	// Validate if the tag exists
+	tagExists, err := container.WithExec([]string{
+		"git", "tag", "--list", tagName,
+	}).Stdout(ctx)
+	if err != nil || strings.TrimSpace(tagExists) != tagName {
+		return fmt.Errorf("tag %s does not exist after creation: %v", tagName, err)
+	}
+
+	// Push the tag to the remote repository
 	if _, err := container.WithExec([]string{
 		"git", "push", "origin", tagName,
 	}).Stdout(ctx); err != nil {
