@@ -137,16 +137,32 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		"git", "config", "--global", "http.https://github.com/.extraheader", "AUTHORIZATION: basic ${token}",
 	})
 
-	// Create the tag with force to ensure it's created even if it exists
+	// Get current commit hash
+	hash, err := container.WithExec([]string{
+		"git", "rev-parse", "HEAD",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting current commit hash: %v", err)
+	}
+	hash = strings.TrimSpace(hash)
+
+	// Create the tag with force pointing to the current commit
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-f", "-a", tagName, "-m", commitMsg,
+		"git", "tag", "-f", "-a", tagName, "-m", commitMsg, hash,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
+	// Verify the tag exists
+	if _, err := container.WithExec([]string{
+		"git", "show-ref", "--tags", tagName,
+	}).Stdout(ctx); err != nil {
+		return fmt.Errorf("error verifying tag: %v", err)
+	}
+
 	// Push the tag to the remote repository with force
 	if _, err := container.WithExec([]string{
-		"git", "push", "-f", "origin", tagName,
+		"git", "push", "-f", "origin", "refs/tags/"+tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
