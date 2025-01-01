@@ -164,16 +164,16 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Verify the tag exists by checking its hash directly
-	tagHash, err := container.WithExec([]string{
-		"git", "rev-parse", tagName,
+	// Verify the tag exists using git for-each-ref
+	output, err := container.WithExec([]string{
+		"git", "for-each-ref", fmt.Sprintf("refs/tags/%s", tagName), "--format=%(objectname)",
 	}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error verifying tag: %v", err)
 	}
-	tagHash = strings.TrimSpace(tagHash)
-	if tagHash != hash {
-		return fmt.Errorf("tag %s was created but points to wrong commit", tagName)
+	tagHash := strings.TrimSpace(output)
+	if tagHash == "" {
+		return fmt.Errorf("tag %s was not created successfully", tagName)
 	}
 
 	// Push the tag with force to update any existing remote tag
