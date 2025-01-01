@@ -137,6 +137,11 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		"git", "config", "--global", "http.https://github.com/.extraheader", "AUTHORIZATION: basic ${token}",
 	})
 
+	// Make sure we're on the main branch and up to date
+	container = container.WithExec([]string{
+		"git", "checkout", "main",
+	})
+
 	// Get current commit hash
 	hash, err := container.WithExec([]string{
 		"git", "rev-parse", "HEAD",
@@ -146,30 +151,27 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 	}
 	hash = strings.TrimSpace(hash)
 
-	// Create the tag with force pointing to the current commit
+	// Create a lightweight tag (without -a flag) pointing to the current commit
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-f", "-a", tagName, "-m", commitMsg, hash,
+		"git", "tag", "-f", tagName, hash,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Update Git's packed refs to ensure the tag is visible
-	if _, err := container.WithExec([]string{
-		"git", "pack-refs", "--all",
-	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error packing refs: %v", err)
+	// Verify the tag exists and get its hash
+	tagHash, err := container.WithExec([]string{
+		"git", "rev-parse", tagName,
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error verifying tag: %v", err)
+	}
+	if strings.TrimSpace(tagHash) != hash {
+		return fmt.Errorf("tag was created but points to wrong commit")
 	}
 
-	// List all tags to ensure Git's refs are up to date
+	// Push the tag to the remote repository
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-l",
-	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error listing tags: %v", err)
-	}
-
-	// Push the tag to the remote repository with force
-	if _, err := container.WithExec([]string{
-		"git", "push", "-f", "origin", tagName,
+		"git", "push", "origin", tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
