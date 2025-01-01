@@ -1,3 +1,4 @@
+// main.go
 package main
 
 import (
@@ -6,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"dagger/release/internal/dagger"
+	dag "dagger.io/dagger"
 )
 
 // Release handles the CI/CD pipeline for all modules
@@ -18,7 +19,7 @@ func New() *Release {
 }
 
 // Run executes the release pipeline for all modules
-func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+func (m *Release) Run(ctx context.Context, source *dag.Directory, token *dag.Secret) error {
 	// Detect modules
 	modules, err := m.detectModules(ctx, source)
 	if err != nil {
@@ -38,26 +39,16 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		WithEnvVariable("GIT_AUTHOR_NAME", "github-actions[bot]").
 		WithEnvVariable("GIT_AUTHOR_EMAIL", "github-actions[bot]@users.noreply.github.com").
 		WithEnvVariable("GIT_COMMITTER_NAME", "github-actions[bot]").
-		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com")
+		WithEnvVariable("GIT_COMMITTER_EMAIL", "github-actions[bot]@users.noreply.github.com").
+		WithSecretVariable("token", token)
 
-	// Configure Git with token
+	// Fetch tags and reset to main branch
 	container = container.WithExec([]string{
-		"git", "config", "--global", "url.https://oauth2:token@github.com/.insteadOf", "https://github.com/",
-	}).WithSecretVariable("token", token)
-
-	// Initialize Git repository
-	container = container.WithExec([]string{"git", "init"})
-
-	// Add remote and fetch
-	container = container.WithExec([]string{
-		"sh", "-c",
-		`git remote add origin https://github.com/felipepimentel/daggerverse.git && git fetch --tags --force`,
-	})
-
-	// Configure Git branch
-	container = container.WithExec([]string{
-		"sh", "-c",
-		`git checkout -b temp && git reset --hard origin/main`,
+		"sh", "-c", `
+		git fetch --tags --force
+		git checkout main
+		git reset --hard origin/main
+		`,
 	})
 
 	// Get the last commit message
@@ -71,16 +62,16 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 	// Process each module
 	for _, module := range modules {
 		moduleContainer := container.WithWorkdir(filepath.Join("/src", module))
-		
+
 		// Get current version
-		version, err := m.getCurrentVersion(ctx, moduleContainer, module)
+		currentVersion, err := m.getCurrentVersion(ctx, moduleContainer, module)
 		if err != nil {
 			return fmt.Errorf("error getting current version for %s: %v", module, err)
 		}
 
 		// Determine version bump type
 		commitType := m.getCommitType(commitMsg)
-		newVersion, err := m.bumpVersion(version, commitType)
+		newVersion, err := m.bumpVersion(currentVersion, commitType)
 		if err != nil {
 			return fmt.Errorf("error bumping version for %s: %v", module, err)
 		}
@@ -108,7 +99,7 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 }
 
 // detectModules finds all Dagger modules in the repository
-func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) ([]string, error) {
+func (m *Release) detectModules(ctx context.Context, source *dag.Directory) ([]string, error) {
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -135,10 +126,9 @@ func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) (
 }
 
 // createAndPushTag creates and pushes a Git tag with the commit message
-func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
+func (m *Release) createAndPushTag(ctx context.Context, container *dag.Container, tagName, commitMsg string) error {
 	if _, err := container.WithExec([]string{
-		"git", "tag", "-a", tagName,
-		"-m", commitMsg,
+		"git", "tag", "-a", tagName, "-m", commitMsg,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error creating tag: %v", err)
 	}
@@ -167,7 +157,7 @@ func (m *Release) getCommitType(msg string) string {
 }
 
 // getCurrentVersion gets the current version of a module
-func (m *Release) getCurrentVersion(ctx context.Context, container *dagger.Container, module string) (string, error) {
+func (m *Release) getCurrentVersion(ctx context.Context, container *dag.Container, module string) (string, error) {
 	output, err := container.WithExec([]string{
 		"sh", "-c",
 		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
@@ -208,4 +198,4 @@ func (m *Release) bumpVersion(version, commitType string) (string, error) {
 	}
 
 	return fmt.Sprintf("%d.%d.%d", major, minor, patch), nil
-} 
+}
