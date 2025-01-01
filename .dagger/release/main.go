@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"dagger/release/internal/dagger"
@@ -16,8 +17,38 @@ func New() *Release {
 	return &Release{}
 }
 
-// Run executes the release pipeline for all modules
-func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+// DetectModules finds all Dagger modules in the repository
+func (m *Release) DetectModules(ctx context.Context, source *dagger.Directory) ([]string, error) {
+	// Use alpine container to find modules
+	container := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"find", ".", "-name", "dagger.json", "-exec", "dirname", "{}", ";"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error finding modules: %v", err)
+	}
+
+	// Process the output to get module paths
+	var modules []string
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if line == "" {
+			continue
+		}
+		// Remove "./" prefix if present
+		module := strings.TrimPrefix(line, "./")
+		if module != "" {
+			modules = append(modules, module)
+		}
+	}
+
+	return modules, nil
+}
+
+// ReleaseModule handles the release process for a single module
+func (m *Release) ReleaseModule(ctx context.Context, source *dagger.Directory, modulePath string, token *dagger.Secret) error {
 	// Setup Git container
 	container := dag.Container().
 		From("alpine:latest").
@@ -34,11 +65,6 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		"git", "config", "--global", "url.https://oauth2:token@github.com/.insteadOf", "https://github.com/",
 	}).WithSecretVariable("token", token)
 
-	// Initialize Git repository and fetch tags
-	container = container.WithExec([]string{"git", "init"})
-	container = container.WithExec([]string{"git", "remote", "add", "origin", "https://github.com/felipepimentel/daggerverse.git"})
-	container = container.WithExec([]string{"git", "fetch", "--tags", "--force"})
-
 	// Get the last commit message
 	commitMsg, err := container.WithExec([]string{
 		"git", "log", "-1", "--pretty=%B",
@@ -47,47 +73,55 @@ func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagg
 		return fmt.Errorf("error getting commit message: %v", err)
 	}
 
-	// Determine commit type
-	commitType := m.getCommitType(commitMsg)
-
-	// List of modules to version
-	modules := []string{
-		"python-poetry",
-		"python-pypi",
-		"python-pipeline",
+	// Get current version
+	version, err := m.getCurrentVersion(ctx, container, modulePath)
+	if err != nil {
+		return fmt.Errorf("error getting current version: %v", err)
 	}
 
-	// Process each module
-	for _, module := range modules {
-		// Get current version
-		version, err := m.getCurrentVersion(ctx, container, module)
-		if err != nil {
-			return fmt.Errorf("error getting current version for %s: %v", module, err)
-		}
+	// Determine version bump type
+	commitType := m.getCommitType(commitMsg)
+	newVersion, err := m.bumpVersion(version, commitType)
+	if err != nil {
+		return fmt.Errorf("error bumping version: %v", err)
+	}
 
-		// Bump version
-		newVersion, err := m.bumpVersion(version, commitType)
-		if err != nil {
-			return fmt.Errorf("error bumping version for %s: %v", module, err)
-		}
+	// Create and push tag
+	tagName := fmt.Sprintf("%s/v%s", modulePath, newVersion)
+	if err := m.createAndPushTag(ctx, container, tagName, commitMsg); err != nil {
+		return fmt.Errorf("error handling tag: %v", err)
+	}
 
-		// Create tag
-		tagName := fmt.Sprintf("%s/v%s", module, newVersion)
-		_, err = container.WithExec([]string{
-			"git", "tag", "-a", tagName,
-			"-m", fmt.Sprintf("Release %s", tagName),
-		}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error creating tag for %s: %v", module, err)
-		}
+	// Publish to Daggerverse
+	publishContainer := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir(filepath.Join("/src", modulePath)).
+		WithExec([]string{"apk", "add", "--no-cache", "dagger"}).
+		WithExec([]string{"dagger", "publish"})
 
-		// Push tag
-		_, err = container.WithExec([]string{
-			"git", "push", "origin", tagName,
-		}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error pushing tag for %s: %v", module, err)
-		}
+	if _, err := publishContainer.Sync(ctx); err != nil {
+		return fmt.Errorf("error publishing module: %v", err)
+	}
+
+	return nil
+}
+
+// createAndPushTag creates and pushes a Git tag with the commit message
+func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
+	// Create tag with commit message
+	if _, err := container.WithExec([]string{
+		"git", "tag", "-a", tagName,
+		"-m", commitMsg,
+	}).Stdout(ctx); err != nil {
+		return fmt.Errorf("error creating tag: %v", err)
+	}
+
+	// Push tag
+	if _, err := container.WithExec([]string{
+		"git", "push", "origin", tagName,
+	}).Stdout(ctx); err != nil {
+		return fmt.Errorf("error pushing tag: %v", err)
 	}
 
 	return nil

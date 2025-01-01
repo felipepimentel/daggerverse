@@ -27,7 +27,7 @@ jobs:
         uses: dagger/dagger-for-github@v7
         with:
           verb: call
-          args: run --source . --token env:GITHUB_TOKEN
+          args: detect-modules --source . release-module --source . --token env:GITHUB_TOKEN
           module: ./.dagger/release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
