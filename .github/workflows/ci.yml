@@ -23,11 +23,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Release Pipeline
+      - name: Detect Modules
+        id: detect-modules
         uses: dagger/dagger-for-github@v7
         with:
           verb: call
-          args: detect-modules --source . release-module --source . --token env:GITHUB_TOKEN
+          args: detect-modules --source .
+          module: ./.dagger/release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Modules
+        if: steps.detect-modules.outputs.stdout != '[]'
+        uses: dagger/dagger-for-github@v7
+        with:
+          verb: call
+          args: release-module --source . --token env:GITHUB_TOKEN --module-path ${{ fromJson(steps.detect-modules.outputs.stdout)[0] }}
           module: ./.dagger/release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
