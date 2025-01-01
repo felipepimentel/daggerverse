@@ -164,16 +164,30 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Verify the tag exists locally
-	if _, err := container.WithExec([]string{
-		"git", "show-ref", "--tags", tagName,
-	}).Stdout(ctx); err != nil {
-		return fmt.Errorf("error verifying tag creation: %v", err)
+	// List all tags to verify our tag exists
+	output, err := container.WithExec([]string{
+		"git", "tag", "-l",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error listing tags: %v", err)
+	}
+	
+	// Check if our tag is in the list
+	tags := strings.Split(strings.TrimSpace(output), "\n")
+	tagExists := false
+	for _, tag := range tags {
+		if tag == tagName {
+			tagExists = true
+			break
+		}
+	}
+	if !tagExists {
+		return fmt.Errorf("tag %s was not created successfully", tagName)
 	}
 
 	// Push the tag with force to update any existing remote tag
 	if _, err := container.WithExec([]string{
-		"git", "push", "-f", "origin", "refs/tags/" + tagName,
+		"git", "push", "-f", "origin", tagName,
 	}).Stdout(ctx); err != nil {
 		return fmt.Errorf("error pushing tag: %v", err)
 	}
