@@ -17,39 +17,19 @@ func New() *Release {
 	return &Release{}
 }
 
-// DetectModules finds all Dagger modules in the repository
-func (m *Release) DetectModules(ctx context.Context, source *dagger.Directory) ([]string, error) {
-	// Use alpine container to find modules
-	container := dag.Container().
-		From("alpine:latest").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"find", ".", "-name", "dagger.json", "-exec", "dirname", "{}", ";"})
-
-	output, err := container.Stdout(ctx)
+// Run executes the release pipeline for all modules
+func (m *Release) Run(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+	// Detect modules
+	modules, err := m.detectModules(ctx, source)
 	if err != nil {
-		return nil, fmt.Errorf("error finding modules: %v", err)
+		return fmt.Errorf("error detecting modules: %v", err)
 	}
 
-	// Process the output to get module paths
-	var modules []string
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		if line == "" {
-			continue
-		}
-		// Remove "./" prefix if present
-		module := strings.TrimPrefix(line, "./")
-		if module != "" {
-			modules = append(modules, module)
-		}
+	if len(modules) == 0 {
+		return fmt.Errorf("no modules found")
 	}
 
-	return modules, nil
-}
-
-// ReleaseModule handles the release process for a single module
-func (m *Release) ReleaseModule(ctx context.Context, source *dagger.Directory, modulePath string, token *dagger.Secret) error {
-	// Setup Git container
+	// Setup base container for Git operations
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -73,43 +53,74 @@ func (m *Release) ReleaseModule(ctx context.Context, source *dagger.Directory, m
 		return fmt.Errorf("error getting commit message: %v", err)
 	}
 
-	// Get current version
-	version, err := m.getCurrentVersion(ctx, container, modulePath)
-	if err != nil {
-		return fmt.Errorf("error getting current version: %v", err)
-	}
+	// Process each module in parallel
+	for _, module := range modules {
+		moduleContainer := container.WithWorkdir(filepath.Join("/src", module))
+		
+		// Get current version
+		version, err := m.getCurrentVersion(ctx, moduleContainer, module)
+		if err != nil {
+			return fmt.Errorf("error getting current version for %s: %v", module, err)
+		}
 
-	// Determine version bump type
-	commitType := m.getCommitType(commitMsg)
-	newVersion, err := m.bumpVersion(version, commitType)
-	if err != nil {
-		return fmt.Errorf("error bumping version: %v", err)
-	}
+		// Determine version bump type
+		commitType := m.getCommitType(commitMsg)
+		newVersion, err := m.bumpVersion(version, commitType)
+		if err != nil {
+			return fmt.Errorf("error bumping version for %s: %v", module, err)
+		}
 
-	// Create and push tag
-	tagName := fmt.Sprintf("%s/v%s", modulePath, newVersion)
-	if err := m.createAndPushTag(ctx, container, tagName, commitMsg); err != nil {
-		return fmt.Errorf("error handling tag: %v", err)
-	}
+		// Create and push tag
+		tagName := fmt.Sprintf("%s/v%s", module, newVersion)
+		if err := m.createAndPushTag(ctx, moduleContainer, tagName, commitMsg); err != nil {
+			return fmt.Errorf("error handling tag for %s: %v", module, err)
+		}
 
-	// Publish to Daggerverse
-	publishContainer := dag.Container().
-		From("alpine:latest").
-		WithDirectory("/src", source).
-		WithWorkdir(filepath.Join("/src", modulePath)).
-		WithExec([]string{"apk", "add", "--no-cache", "dagger"}).
-		WithExec([]string{"dagger", "publish"})
+		// Publish to Daggerverse
+		publishContainer := dag.Container().
+			From("alpine:latest").
+			WithDirectory("/src", source).
+			WithWorkdir(filepath.Join("/src", module)).
+			WithExec([]string{"apk", "add", "--no-cache", "dagger"}).
+			WithExec([]string{"dagger", "publish"})
 
-	if _, err := publishContainer.Sync(ctx); err != nil {
-		return fmt.Errorf("error publishing module: %v", err)
+		if _, err := publishContainer.Sync(ctx); err != nil {
+			return fmt.Errorf("error publishing module %s: %v", module, err)
+		}
 	}
 
 	return nil
 }
 
+// detectModules finds all Dagger modules in the repository
+func (m *Release) detectModules(ctx context.Context, source *dagger.Directory) ([]string, error) {
+	container := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"find", ".", "-name", "dagger.json", "-exec", "dirname", "{}", ";"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error finding modules: %v", err)
+	}
+
+	var modules []string
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if line == "" {
+			continue
+		}
+		module := strings.TrimPrefix(line, "./")
+		if module != "" {
+			modules = append(modules, module)
+		}
+	}
+
+	return modules, nil
+}
+
 // createAndPushTag creates and pushes a Git tag with the commit message
 func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Container, tagName, commitMsg string) error {
-	// Create tag with commit message
 	if _, err := container.WithExec([]string{
 		"git", "tag", "-a", tagName,
 		"-m", commitMsg,
@@ -117,7 +128,6 @@ func (m *Release) createAndPushTag(ctx context.Context, container *dagger.Contai
 		return fmt.Errorf("error creating tag: %v", err)
 	}
 
-	// Push tag
 	if _, err := container.WithExec([]string{
 		"git", "push", "origin", tagName,
 	}).Stdout(ctx); err != nil {
