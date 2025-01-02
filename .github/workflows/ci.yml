@@ -55,37 +55,18 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
 
+      - name: Initialize Module
+        run: ./scripts/init-module.sh "${{ matrix.module }}"
+
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MODULE_PATH: ${{ matrix.module }}
-          MODULE_NAME: ${{ matrix.module }}
-        run: |
-          echo "MODULE_NAME=${{ matrix.module }}" >> $GITHUB_ENV
-          echo "MODULE_PATH=${{ matrix.module }}" >> $GITHUB_ENV
-          # Force semantic-release to create a version, fail if it can't
-          npx semantic-release --no-ci-skip --dry-run || {
-            echo "::error::No changes detected that would trigger a new version. Please ensure your commits follow conventional commits format."
-            exit 1
-          }
-          npx semantic-release
+        run: ./scripts/release.sh "${{ matrix.module }}"
 
       - name: Setup Dagger
         uses: dagger/dagger-for-github@v7
         with:
           version: "latest"
-          workdir: ${{ matrix.module }}
-
-      - name: Get Latest Tag
-        id: get-tag
-        run: |
-          TAG=$(git describe --tags --abbrev=0 --match "${{ matrix.module }}/v*" || echo "")
-          if [ -z "$TAG" ]; then
-            echo "::error::No semantic version tag found for module ${{ matrix.module }}. Release step failed to create a tag."
-            exit 1
-          fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Publish to Daggerverse
-        working-directory: ${{ matrix.module }}
-        run: dagger publish
+        run: ./scripts/publish.sh "${{ matrix.module }}"
