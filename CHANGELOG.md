@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/felipepimentel/daggerverse/compare/v1.9.0...v1.10.0) (2025-01-02)
+
+
+### Features
+
+* enhance CICD function to support publishing to PyPI ([7015f65](https://github.com/felipepimentel/daggerverse/commit/7015f658bdc6a0fbb78c558eb00d83602ad17c0a))
+
 # [1.9.0](https://github.com/felipepimentel/daggerverse/compare/v1.8.0...v1.9.0) (2025-01-02)
 
 
