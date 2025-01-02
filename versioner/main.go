@@ -5,19 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"versioner/internal/dagger"
+	"dagger.io/dagger"
 )
 
-type Versioner struct {
+type Module struct {
 	dag *dagger.Client
 }
 
-func New(c *dagger.Client) *Versioner {
-	return &Versioner{dag: c}
-}
-
-// BumpVersion increments the version of a module based on the commit type
-func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, module, commitType string) (string, error) {
+func (m *Module) BumpVersion(ctx context.Context, source *dagger.Directory, module string, commitType dagger.Optional[string]) (string, error) {
 	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -46,7 +41,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, m
 		}
 
 		// Increment version based on commit type
-		switch commitType {
+		switch commitType.GetOr("patch") {
 		case "feat":
 			minor++
 			patch = 0
@@ -75,8 +70,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, m
 	return newTag, nil
 }
 
-// GetCurrentVersion gets the current version of a module
-func (m *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
+func (m *Module) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
 	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
