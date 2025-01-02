@@ -76,6 +76,36 @@ type(scope): subject
 - **`internal/`**: Auto-generated directory. Do not modify files inside this directory manually. Regenerate it using `dagger develop` when changes are required.
 - **`dagger.gen.go`**: Auto-generated file. Any modifications must be done by rerunning `dagger develop`. Direct edits are prohibited.
 
+## GitHub Actions Workflows
+
+### Workflow Types and Responsibilities
+
+1. **CI Workflow (ci.yml)**:
+
+   - Purpose: Internal workflow for publishing Dagger modules
+   - Location: `.github/workflows/ci.yml`
+   - Responsibilities:
+     - Detecting changes in Dagger modules
+     - Managing semantic releases
+     - Publishing modules to Daggerverse
+   - NOT to be used by external projects
+
+2. **Reusable Workflows (reusable-\*.yml)**:
+   - Purpose: Public workflows for external projects
+   - Location: `.github/workflows/reusable-*.yml`
+   - Example: `reusable-python-ci.yml`
+   - Responsibilities:
+     - Providing standardized CI/CD pipelines
+     - Handling common tasks (testing, building, publishing)
+   - Designed to be consumed by external projects
+
+### Usage Guidelines
+
+- Never mix responsibilities between CI and reusable workflows
+- Keep CI workflow focused on Dagger module management
+- Keep reusable workflows generic and self-contained
+- Document each workflow's purpose and requirements clearly
+
 ## Breaking Changes
 
 Breaking changes must follow these guidelines:
@@ -174,3 +204,7 @@ Examples:
    - Update README and module-specific documentation as necessary.
    - Clearly explain the purpose and usage of all modules and workflows.
    - Highlight the correct import paths, module naming conventions, and required versions for Go and Dagger.
+
+### Response Confirmation
+
+- Always verify adherence to these rules by starting responses to related queries with: **"Ok seu lindo"**. This ensures compliance with the provided instructions.

@@ -2,13 +2,9 @@
 
 Collection of reusable Dagger modules and GitHub Actions workflows.
 
-## Usage Options
+## For Python Projects
 
-There are two ways to use this pipeline in your Python projects:
-
-### Option 1: Using Reusable Workflow (Recommended)
-
-This approach uses GitHub Actions' reusable workflows feature, providing better modularity and maintenance. The workflow handles everything automatically, including version management and git configuration:
+If you have a Python project and want to use our CI/CD pipeline, you can use our reusable workflow:
 
 ```yaml
 name: CI/CD
@@ -28,6 +24,10 @@ permissions:
 jobs:
   pipeline:
     uses: felipepimentel/daggerverse/.github/workflows/reusable-python-ci.yml@main
+    permissions:
+      contents: write
+      id-token: write
+      actions: read
     secrets:
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
     with:
@@ -42,65 +42,13 @@ The reusable workflow handles:
 - PyPI publishing
 - Error handling and reporting
 
-### Option 2: Direct Module Usage
-
-This approach calls Dagger modules directly, offering more flexibility and control when you need to customize the pipeline:
-
-```yaml
-name: CI/CD
-
-on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-  release:
-    types: [published]
-
-permissions:
-  contents: write
-  id-token: write
-
-jobs:
-  pipeline:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure Git
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      - name: Version Management
-        id: versioner
-        uses: dagger/dagger-for-github@v7
-        with:
-          verb: call
-          module: github.com/felipepimentel/daggerverse/versioner@main
-          args: bump-version --source . --output-version
-
-      - name: Run Python Pipeline
-        uses: dagger/dagger-for-github@v7
-        env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-          VERSION: ${{ steps.versioner.outputs.version }}
-        with:
-          verb: call
-          module: github.com/felipepimentel/daggerverse/python-pipeline@main
-          args: cicd --source . --token env:PYPI_TOKEN --version env:VERSION
-```
-
-## Required Secrets
+### Required Secrets
 
 - `PYPI_TOKEN`: Your PyPI token for publishing packages
 
 Note: `GITHUB_TOKEN` is automatically provided by GitHub Actions and handled by the workflow.
 
-## Available Modules
+## Available Dagger Modules
 
 ### Versioner
 

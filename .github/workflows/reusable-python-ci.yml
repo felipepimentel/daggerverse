@@ -31,6 +31,7 @@ jobs:
       pull-requests: write
       packages: write
       statuses: write
+      actions: read
     outputs:
       version: ${{ steps.versioner.outputs.version }}
     steps:
