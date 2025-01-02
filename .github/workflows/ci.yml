@@ -1,91 +1,47 @@
-name: Release
+name: CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  release:
+    types: [published]
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
-  packages: write
-  statuses: write
+  id-token: write
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-22.04
+  version:
+    name: Version Management
+    runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      version: ${{ steps.versioner.outputs.version }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - id: set-matrix
-        run: |
-          MODULES=$(find . -name "dagger.json" -exec dirname {} \; | sed 's|^./||' | jq -R -s -c 'split("\n")[:-1]')
-          echo "matrix=${MODULES}" >> $GITHUB_OUTPUT
-
-  release:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.matrix != '[]' }}
-    strategy:
-      matrix:
-        module: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-      fail-fast: false
-
-    name: Release ${{ matrix.module }}
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      packages: write
-      statuses: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-
-      - name: Install dependencies
-        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github @semantic-release/exec
 
       - name: Configure Git
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          git config pull.rebase true
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Make scripts executable
-        run: |
-          chmod +x ./scripts/*.sh
-          git add ./scripts/*.sh
-          git commit -m "chore: make scripts executable" || true
-
-      - name: Initialize Module
-        run: ./scripts/init-module.sh "${{ matrix.module }}"
-
-      - name: Create Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/release.sh "${{ matrix.module }}"
-
-      - name: Setup Dagger
+      - name: Version Management
+        id: versioner
         uses: dagger/dagger-for-github@v7
         with:
-          version: "latest"
+          verb: call
+          module: github.com/felipepimentel/daggerverse/versioner@main
+          args: bump-version --source . --output-version
 
-      - name: Publish to Daggerverse
-        env:
-          FORCE_PUBLISH: "true"
-        run: ./scripts/publish.sh "${{ matrix.module }}"
+  python:
+    name: Python Pipeline
+    needs: [version]
+    uses: ./.github/workflows/reusable-python-ci.yml
+    secrets:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+    with:
+      source-path: "."

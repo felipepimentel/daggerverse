@@ -31,11 +31,26 @@ jobs:
       pull-requests: write
       packages: write
       statuses: write
+    outputs:
+      version: ${{ steps.versioner.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ github.token }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Version Management
+        id: versioner
+        uses: dagger/dagger-for-github@v7
+        with:
+          verb: call
+          module: github.com/felipepimentel/daggerverse/versioner@main
+          args: bump-version --source ${{ inputs.source-path }} --output-version
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
@@ -43,7 +58,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          VERSION: ${{ steps.versioner.outputs.version }}
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python-pipeline@main
-          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN
+          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN --version env:VERSION
