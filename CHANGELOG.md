@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/felipepimentel/daggerverse/compare/v1.10.0...v1.11.0) (2025-01-02)
+
+
+### Features
+
+* implement automatic version bumping in CICD function ([1d95be0](https://github.com/felipepimentel/daggerverse/commit/1d95be088899719efd21bf1ac33b19493b639abf))
+
 # [1.10.0](https://github.com/felipepimentel/daggerverse/compare/v1.9.0...v1.10.0) (2025-01-02)
 
 
