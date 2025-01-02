@@ -14,6 +14,7 @@ RESET  := \033[0m
 check-deps:
 	@command -v go >/dev/null 2>&1 || { echo "${YELLOW}go is not installed. Please install it.${RESET}"; exit 1; }
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "${YELLOW}golangci-lint is not installed. Please install it.${RESET}"; exit 1; }
+	@command -v dagger >/dev/null 2>&1 || { echo "${YELLOW}dagger is not installed. Please install it.${RESET}"; exit 1; }
 
 # Check if MODULE is valid
 check-module:
@@ -46,7 +47,7 @@ clean: check-deps ## Clean generated files and dependencies (MODULE=<module> for
 		echo "${GREEN}Cleaning all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Cleaning $$module...${RESET}"; \
-			cd $$module && rm -rf internal dagger.gen.go go.sum 2>/dev/null || true; \
+			(cd $$module && rm -rf internal dagger.gen.go go.sum 2>/dev/null || true); \
 		done; \
 	fi
 
@@ -67,12 +68,12 @@ tidy: check-deps ## Run go mod tidy (MODULE=<module> for specific module)
 develop: check-deps ## Run dagger develop (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Developing $(MODULE)...${RESET}"; \
-		cd $(MODULE) && dagger develop; \
+		(cd $(MODULE) && dagger develop); \
 	else \
 		echo "${GREEN}Running dagger develop on all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Developing $$module...${RESET}"; \
-			cd $$module && dagger develop; \
+			(cd $$module && dagger develop); \
 		done; \
 	fi
 
@@ -80,7 +81,7 @@ develop: check-deps ## Run dagger develop (MODULE=<module> for specific module)
 test: check-deps ## Run tests (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Testing $(MODULE)...${RESET}"; \
-		cd $(MODULE) && go test ./...; \
+		(cd $(MODULE) && go test ./...); \
 	else \
 		echo "${GREEN}Running tests on all modules in parallel...${RESET}"; \
 		echo $(MODULES) | xargs -n 1 -P 4 -I {} bash -c 'echo "Testing {}"; cd {} && go test ./...'; \
@@ -90,12 +91,12 @@ test: check-deps ## Run tests (MODULE=<module> for specific module)
 fmt: check-deps ## Format Go files (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Formatting $(MODULE)...${RESET}"; \
-		cd $(MODULE) && go fmt ./...; \
+		(cd $(MODULE) && go fmt ./...); \
 	else \
 		echo "${GREEN}Formatting Go files in all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Formatting $$module...${RESET}"; \
-			cd $$module && go fmt ./...; \
+			(cd $$module && go fmt ./...); \
 		done; \
 	fi
 
@@ -103,12 +104,12 @@ fmt: check-deps ## Format Go files (MODULE=<module> for specific module)
 vet: check-deps ## Run go vet (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Vetting $(MODULE)...${RESET}"; \
-		cd $(MODULE) && go vet ./...; \
+		(cd $(MODULE) && go vet ./...); \
 	else \
 		echo "${GREEN}Running go vet on all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Vetting $$module...${RESET}"; \
-			cd $$module && go vet ./...; \
+			(cd $$module && go vet ./...); \
 		done; \
 	fi
 
@@ -116,12 +117,12 @@ vet: check-deps ## Run go vet (MODULE=<module> for specific module)
 lint: check-deps ## Run linters (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Linting $(MODULE)...${RESET}"; \
-		cd $(MODULE) && golangci-lint run ./...; \
+		(cd $(MODULE) && golangci-lint run ./...); \
 	else \
 		echo "${GREEN}Running linters on all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Linting $$module...${RESET}"; \
-			cd $$module && golangci-lint run ./...; \
+			(cd $$module && golangci-lint run ./...); \
 		done; \
 	fi
 
@@ -129,12 +130,12 @@ lint: check-deps ## Run linters (MODULE=<module> for specific module)
 build: check-deps ## Build modules (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Building $(MODULE)...${RESET}"; \
-		cd $(MODULE) && go build ./...; \
+		(cd $(MODULE) && go build ./...); \
 	else \
 		echo "${GREEN}Building all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Building $$module...${RESET}"; \
-			cd $$module && go build ./...; \
+			(cd $$module && go build ./...); \
 		done; \
 	fi
 
@@ -142,12 +143,12 @@ build: check-deps ## Build modules (MODULE=<module> for specific module)
 update-deps: check-deps ## Update dependencies (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Updating dependencies for $(MODULE)...${RESET}"; \
-		cd $(MODULE) && go get -u ./... && go mod tidy; \
+		(cd $(MODULE) && go get -u ./... && go mod tidy); \
 	else \
 		echo "${GREEN}Updating dependencies for all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			echo "${YELLOW}Updating dependencies for $$module...${RESET}"; \
-			cd $$module && go get -u ./... && go mod tidy; \
+			(cd $$module && go get -u ./... && go mod tidy); \
 		done; \
 	fi
 

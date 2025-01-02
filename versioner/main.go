@@ -1,5 +1,3 @@
-// Package main provides functionality for semantic versioning of projects.
-// It uses semantic-release for version management.
 package main
 
 import (
@@ -7,29 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	"dagger.io/dagger"
+	"versioner/internal/dagger"
 )
 
-// Versioner handles semantic versioning for Dagger modules
-type Versioner struct{
+type Versioner struct {
 	dag *dagger.Client
 }
 
-// New creates a new instance of Versioner
 func New(c *dagger.Client) *Versioner {
 	return &Versioner{dag: c}
 }
 
 // BumpVersion increments the version of a module based on the commit type
-// Parameters:
-// - ctx: The context for the operation
-// - source: The source directory containing the module
-// - module: The name of the module (e.g., "python-poetry")
-// - commitType: The type of commit (feat, fix, etc.)
-//
-// Returns:
-// - string: The new version tag
-// - error: Any error that occurred during the process
 func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, module, commitType string) (string, error) {
 	container := m.dag.Container().
 		From("alpine:latest").
@@ -89,14 +76,6 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, m
 }
 
 // GetCurrentVersion gets the current version of a module
-// Parameters:
-// - ctx: The context for the operation
-// - source: The source directory containing the module
-// - module: The name of the module
-//
-// Returns:
-// - string: The current version tag
-// - error: Any error that occurred during the process
 func (m *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
 	container := m.dag.Container().
 		From("alpine:latest").
