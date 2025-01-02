@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"dagger/python-pipeline/internal/dagger"
 )
@@ -62,6 +63,23 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	// If token is provided, publish to PyPI
 	if token != nil {
 		container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+		
+		// Check if version already exists
+		version, err := container.WithExec([]string{"poetry", "version", "--short"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error getting package version: %v", err)
+		}
+
+		// Try to get package info from PyPI
+		checkCmd := fmt.Sprintf("pip install %s==%s 2>/dev/null || echo 'Version not found'", 
+			"pepperpy-core", // TODO: Get package name dynamically
+			version)
+		out, err := container.WithExec([]string{"sh", "-c", checkCmd}).Stdout(ctx)
+		if err == nil && !strings.Contains(out, "Version not found") {
+			return fmt.Errorf("version %s already exists on PyPI", version)
+		}
+
+		// Publish if version doesn't exist
 		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error publishing to PyPI: %v", err)
