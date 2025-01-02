@@ -9,6 +9,8 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  packages: write
+  statuses: write
 
 jobs:
   detect-changes:
@@ -37,6 +39,12 @@ jobs:
 
     name: Release ${{ matrix.module }}
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+      statuses: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,27 +58,19 @@ jobs:
           node-version: "lts/*"
 
       - name: Install dependencies
-        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github @semantic-release/exec
 
       - name: Configure Git
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
+          git config pull.rebase true
 
       - name: Make scripts executable
         run: |
           chmod +x ./scripts/*.sh
           git add ./scripts/*.sh
           git commit -m "chore: make scripts executable" || true
-
-      - name: Sync with remote
-        run: |
-          git pull --rebase origin main || {
-            echo "Failed to rebase. Resolving conflicts..."
-            git rebase --abort
-            git reset --hard origin/main
-            git clean -fd
-          }
 
       - name: Initialize Module
         run: ./scripts/init-module.sh "${{ matrix.module }}"

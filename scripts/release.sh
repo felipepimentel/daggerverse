@@ -23,6 +23,36 @@ else
     export MODULE_PATH="$MODULE_NAME"
 fi
 
+# Ensure we're up to date with remote
+echo "Syncing with remote repository..."
+git pull --rebase origin main || {
+    echo "Failed to rebase. Resolving conflicts..."
+    git rebase --abort
+    git reset --hard origin/main
+    git clean -fd
+}
+
+# Create .releaserc.json for semantic-release configuration
+cat > .releaserc.json << EOF
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    ["@semantic-release/exec", {
+      "prepareCmd": "poetry version \${nextRelease.version}",
+      "publishCmd": "git add pyproject.toml && git commit -m 'chore(release): bump version to \${nextRelease.version} [skip ci]' || true"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["CHANGELOG.md", "pyproject.toml"],
+      "message": "chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}"
+    }],
+    "@semantic-release/github"
+  ]
+}
+EOF
+
 echo "Running semantic-release dry-run for module $MODULE_NAME"
 
 # Try dry-run first
