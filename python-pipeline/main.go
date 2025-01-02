@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"dagger/python-pipeline/internal/dagger"
@@ -57,29 +58,67 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		}
 	}
 
-	// Build package
-	container = container.WithExec([]string{"poetry", "build"})
-
 	// If token is provided, publish to PyPI
 	if token != nil {
 		container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
 		
-		// Check if version already exists
+		// Get current version
 		version, err := container.WithExec([]string{"poetry", "version", "--short"}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error getting package version: %v", err)
 		}
+		version = strings.TrimSpace(version)
 
-		// Try to get package info from PyPI
-		checkCmd := fmt.Sprintf("pip install %s==%s 2>/dev/null || echo 'Version not found'", 
-			"pepperpy-core", // TODO: Get package name dynamically
-			version)
-		out, err := container.WithExec([]string{"sh", "-c", checkCmd}).Stdout(ctx)
-		if err == nil && !strings.Contains(out, "Version not found") {
-			return fmt.Errorf("version %s already exists on PyPI", version)
+		// Check git log for conventional commits to determine version bump
+		gitLog, err := container.WithExec([]string{"git", "log", "--format=%B", "-n", "1"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error reading git log: %v", err)
 		}
 
-		// Publish if version doesn't exist
+		// Determine version bump based on commit message
+		var newVersion string
+		commitMsg := strings.ToLower(gitLog)
+		parts := strings.Split(version, ".")
+		if len(parts) != 3 {
+			return fmt.Errorf("invalid version format: %s", version)
+		}
+
+		major := parts[0]
+		minor := parts[1]
+		patch := parts[2]
+
+		if strings.Contains(commitMsg, "breaking change") || strings.Contains(commitMsg, "!:") {
+			// Major version bump
+			majorNum, _ := strconv.Atoi(major)
+			newVersion = fmt.Sprintf("%d.0.0", majorNum+1)
+		} else if strings.Contains(commitMsg, "feat") {
+			// Minor version bump
+			minorNum, _ := strconv.Atoi(minor)
+			newVersion = fmt.Sprintf("%s.%d.0", major, minorNum+1)
+		} else {
+			// Patch version bump
+			patchNum, _ := strconv.Atoi(patch)
+			newVersion = fmt.Sprintf("%s.%s.%d", major, minor, patchNum+1)
+		}
+
+		// Update version in pyproject.toml
+		_, err = container.WithExec([]string{"poetry", "version", newVersion}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error updating version: %v", err)
+		}
+
+		// Commit version change
+		container = container.
+			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"}).
+			WithExec([]string{"git", "add", "pyproject.toml"}).
+			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", newVersion)}).
+			WithExec([]string{"git", "push", "origin", "HEAD"})
+
+		// Build package with new version
+		container = container.WithExec([]string{"poetry", "build"})
+
+		// Publish to PyPI
 		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error publishing to PyPI: %v", err)

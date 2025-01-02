@@ -105,7 +105,11 @@ Runs the complete CI/CD pipeline for a Python project. This includes:
 2. Running tests with pytest
 3. Running linting with pylint (if configured)
 4. Building the package
-5. Publishing to PyPI (if token is provided)
+5. Automatic version bumping based on conventional commits
+   - Breaking changes (`BREAKING CHANGE` or `!:`) -> Major version bump
+   - Features (`feat:`) -> Minor version bump
+   - Other changes -> Patch version bump
+6. Publishing to PyPI (if token is provided)
 
 ```bash
 # Run the CI/CD pipeline without publishing
