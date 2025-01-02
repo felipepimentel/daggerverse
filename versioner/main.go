@@ -16,8 +16,8 @@ func New(c *dagger.Client) *Versioner {
 	return &Versioner{dag: c}
 }
 
-func (m *Versioner) BumpVersion(ctx context.Context, commitType string) (*dagger.Container, error) {
-	hostDir := m.dag.Directory()
+func (m *Versioner) BumpVersion(ctx context.Context, source string) (string, error) {
+	hostDir := m.dag.Host().Directory(source)
 	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", hostDir).
@@ -32,7 +32,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, commitType string) (*dagger
 		"git tag -l 'v*' | sort -V | tail -n 1",
 	}).Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting latest tag: %w", err)
+		return "", fmt.Errorf("error getting latest tag: %w", err)
 	}
 
 	var major, minor, patch int
@@ -44,36 +44,29 @@ func (m *Versioner) BumpVersion(ctx context.Context, commitType string) (*dagger
 		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
 		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing version: %w", err)
+			return "", fmt.Errorf("error parsing version: %w", err)
 		}
 
-		// Increment version based on commit type
-		switch commitType {
-		case "feat":
-			minor++
-			patch = 0
-		case "fix", "perf":
-			patch++
-		case "BREAKING CHANGE":
-			major++
-			minor = 0
-			patch = 0
-		default:
-			patch++
-		}
+		// Increment patch version
+		patch++
 	}
 
 	// Format new version tag
 	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
 
-	// Create and push new tag
-	return container.WithExec([]string{
+	// Create new tag
+	_, err = container.WithExec([]string{
 		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
-	}), nil
+	}).Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error creating tag: %w", err)
+	}
+
+	return newTag, nil
 }
 
-func (m *Versioner) GetCurrentVersion(ctx context.Context) (string, error) {
-	hostDir := m.dag.Directory()
+func (m *Versioner) GetCurrentVersion(ctx context.Context, source string) (string, error) {
+	hostDir := m.dag.Host().Directory(source)
 	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", hostDir).
