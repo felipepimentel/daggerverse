@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/felipepimentel/daggerverse/compare/v1.8.0...v1.9.0) (2025-01-02)
+
+
+### Features
+
+* implement CICD function for Python projects in main.go ([8aebac7](https://github.com/felipepimentel/daggerverse/commit/8aebac7c0d9d270985000c95d7834deb79f4ff85))
+
 # [1.8.0](https://github.com/felipepimentel/daggerverse/compare/v1.7.1...v1.8.0) (2025-01-01)
 
 
