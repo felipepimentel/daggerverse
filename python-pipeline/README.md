@@ -94,3 +94,23 @@ The pipeline uses:
 - `python:3.11-slim` as base image
 - Poetry for package management
 - Automated PyPI authentication
+
+## Functions
+
+### CICD
+
+Runs the complete CI/CD pipeline for a Python project. This includes:
+
+1. Installing dependencies with Poetry
+2. Running tests with pytest
+3. Running linting with pylint (if configured)
+4. Building the package
+
+```bash
+# Run the CI/CD pipeline
+dagger call cicd --source .
+```
+
+### BuildAndPublish
+
+Builds and publishes a Python package to PyPI. This includes:

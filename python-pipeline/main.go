@@ -16,6 +16,53 @@ func New() *PythonPipeline {
 	return &PythonPipeline{}
 }
 
+// CICD runs the complete CI/CD pipeline for a Python project.
+// This includes:
+// 1. Installing dependencies
+// 2. Running tests
+// 3. Running linting (if configured)
+// 4. Building the package
+//
+// Parameters:
+// - ctx: The context for the operation
+// - source: The source directory containing the Python project
+//
+// Returns:
+// - error: Any error that occurred during the process
+func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory) error {
+	// Setup Python container with Poetry
+	container := dag.Container().
+		From("python:3.11-slim").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
+
+	// Install dependencies
+	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
+
+	// Run tests
+	_, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running tests: %v", err)
+	}
+
+	// Run linting if configured (looking for .pylintrc or setup.cfg)
+	if _, err := container.WithExec([]string{"test", "-f", ".pylintrc"}).Stdout(ctx); err == nil {
+		_, err := container.WithExec([]string{"poetry", "run", "pylint", "."}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error running linting: %v", err)
+		}
+	}
+
+	// Build package
+	_, err = container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error building package: %v", err)
+	}
+
+	return nil
+}
+
 // BuildAndPublish builds a Python package and publishes it to PyPI.
 // The process includes:
 // 1. Installing dependencies with Poetry
