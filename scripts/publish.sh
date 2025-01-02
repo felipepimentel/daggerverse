@@ -30,7 +30,16 @@ echo "Publishing module $MODULE_NAME with version $TAG"
 
 # Publish to Daggerverse
 cd "$MODULE_NAME"
-dagger publish || {
+
+# Use --force flag if FORCE_PUBLISH is set to true
+if [ "${FORCE_PUBLISH:-}" = "true" ]; then
+    echo "Force publishing enabled"
+    PUBLISH_CMD="dagger publish --force"
+else
+    PUBLISH_CMD="dagger publish"
+fi
+
+$PUBLISH_CMD || {
     echo "::error::Failed to publish module $MODULE_NAME"
     echo "::error::Please check if the module is properly configured and try again"
     exit 1

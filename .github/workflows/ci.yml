@@ -56,7 +56,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
       - name: Make scripts executable
-        run: chmod +x ./scripts/*.sh
+        run: |
+          chmod +x ./scripts/*.sh
+          git add ./scripts/*.sh
+          git commit -m "chore: make scripts executable" || true
 
       - name: Initialize Module
         run: ./scripts/init-module.sh "${{ matrix.module }}"
@@ -72,4 +75,6 @@ jobs:
           version: "latest"
 
       - name: Publish to Daggerverse
+        env:
+          FORCE_PUBLISH: "true"
         run: ./scripts/publish.sh "${{ matrix.module }}"
