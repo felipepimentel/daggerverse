@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dagger/versioner/internal/dagger"
+	"github.com/felipepimentel/daggerverse/versioner/internal/dagger"
 )
 
 type Versioner struct {
