@@ -5,27 +5,34 @@ import (
 	"fmt"
 	"strings"
 
-	"dagger.io/dagger"
+	"dagger/versioner/internal/dagger"
 )
 
-type Module struct {
+type Versioner struct {
 	dag *dagger.Client
 }
 
-func (m *Module) BumpVersion(ctx context.Context, source *dagger.Directory, module string, commitType dagger.Optional[string]) (string, error) {
+func New(c *dagger.Client) *Versioner {
+	return &Versioner{dag: c}
+}
+
+func (m *Versioner) BumpVersion(ctx context.Context, commitType string) (*dagger.Container, error) {
+	hostDir := m.dag.Directory()
 	container := m.dag.Container().
 		From("alpine:latest").
-		WithDirectory("/src", source).
+		WithDirectory("/src", hostDir).
 		WithWorkdir("/src").
-		WithExec([]string{"apk", "add", "--no-cache", "git"})
+		WithExec([]string{"apk", "add", "--no-cache", "git"}).
+		WithExec([]string{"git", "config", "--global", "user.email", "dagger@example.com"}).
+		WithExec([]string{"git", "config", "--global", "user.name", "Dagger"})
 
-	// Get the latest tag for the module
+	// Get the latest tag
 	output, err := container.WithExec([]string{
 		"sh", "-c",
-		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
+		"git tag -l 'v*' | sort -V | tail -n 1",
 	}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error getting latest tag: %v", err)
+		return nil, fmt.Errorf("error getting latest tag: %w", err)
 	}
 
 	var major, minor, patch int
@@ -34,14 +41,14 @@ func (m *Module) BumpVersion(ctx context.Context, source *dagger.Directory, modu
 		major, minor, patch = 0, 1, 0
 	} else {
 		// Parse existing version
-		version := strings.TrimPrefix(strings.TrimSpace(output), fmt.Sprintf("%s/v", module))
+		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
 		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
 		if err != nil {
-			return "", fmt.Errorf("error parsing version: %v", err)
+			return nil, fmt.Errorf("error parsing version: %w", err)
 		}
 
 		// Increment version based on commit type
-		switch commitType.GetOr("patch") {
+		switch commitType {
 		case "feat":
 			minor++
 			patch = 0
@@ -57,32 +64,28 @@ func (m *Module) BumpVersion(ctx context.Context, source *dagger.Directory, modu
 	}
 
 	// Format new version tag
-	newTag := fmt.Sprintf("%s/v%d.%d.%d", module, major, minor, patch)
+	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
 
 	// Create and push new tag
-	_, err = container.WithExec([]string{
+	return container.WithExec([]string{
 		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
-	}).Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error creating tag: %v", err)
-	}
-
-	return newTag, nil
+	}), nil
 }
 
-func (m *Module) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
+func (m *Versioner) GetCurrentVersion(ctx context.Context) (string, error) {
+	hostDir := m.dag.Directory()
 	container := m.dag.Container().
 		From("alpine:latest").
-		WithDirectory("/src", source).
+		WithDirectory("/src", hostDir).
 		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"})
 
 	output, err := container.WithExec([]string{
 		"sh", "-c",
-		fmt.Sprintf("git tag -l '%s/v*' | sort -V | tail -n 1", module),
+		"git tag -l 'v*' | sort -V | tail -n 1",
 	}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error getting current version: %v", err)
+		return "", fmt.Errorf("error getting current version: %w", err)
 	}
 
 	return strings.TrimSpace(output), nil
