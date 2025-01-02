@@ -1,4 +1,4 @@
-module dagger/versioner
+module github.com/felipepimentel/daggerverse/versioner
 
 go 1.23.2
 

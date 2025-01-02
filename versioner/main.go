@@ -11,11 +11,13 @@ import (
 )
 
 // Versioner handles semantic versioning for Dagger modules
-type Versioner struct{}
+type Versioner struct{
+	dag *dagger.Client
+}
 
 // New creates a new instance of Versioner
-func New() *Versioner {
-	return &Versioner{}
+func New(c *dagger.Client) *Versioner {
+	return &Versioner{dag: c}
 }
 
 // BumpVersion increments the version of a module based on the commit type
@@ -29,7 +31,7 @@ func New() *Versioner {
 // - string: The new version tag
 // - error: Any error that occurred during the process
 func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, module, commitType string) (string, error) {
-	container := dag.Container().
+	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
@@ -96,7 +98,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, m
 // - string: The current version tag
 // - error: Any error that occurred during the process
 func (m *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Directory, module string) (string, error) {
-	container := dag.Container().
+	container := m.dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
