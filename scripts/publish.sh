@@ -13,9 +13,18 @@ if [ ! -d "$MODULE_NAME" ]; then
     exit 1
 fi
 
+# Handle root directory specially
+TAG_PREFIX=""
+if [ "$MODULE_NAME" = "." ]; then
+    echo "Publishing root module"
+    TAG_PREFIX="root"
+else
+    TAG_PREFIX="$MODULE_NAME"
+fi
+
 # Get the latest tag, trying different approaches
-TAG=$(git describe --tags --abbrev=0 --match "$MODULE_NAME/v*" 2>/dev/null || \
-      git tag -l "$MODULE_NAME/v*" | sort -V | tail -n1 || \
+TAG=$(git describe --tags --abbrev=0 --match "$TAG_PREFIX/v*" 2>/dev/null || \
+      git tag -l "$TAG_PREFIX/v*" | sort -V | tail -n1 || \
       echo "")
 
 # If still no tag, something is wrong with the release process
@@ -28,8 +37,10 @@ fi
 
 echo "Publishing module $MODULE_NAME with version $TAG"
 
-# Publish to Daggerverse
-cd "$MODULE_NAME"
+# Change to module directory if not root
+if [ "$MODULE_NAME" != "." ]; then
+    cd "$MODULE_NAME"
+fi
 
 # Use --force flag if FORCE_PUBLISH is set to true
 if [ "${FORCE_PUBLISH:-}" = "true" ]; then

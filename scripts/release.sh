@@ -13,9 +13,15 @@ if [ ! -d "$MODULE_NAME" ]; then
     exit 1
 fi
 
-# Export for semantic-release
-export MODULE_NAME
-export MODULE_PATH="$MODULE_NAME"
+# Handle root directory specially
+if [ "$MODULE_NAME" = "." ]; then
+    echo "Creating release for root module"
+    export MODULE_NAME="root"
+    export MODULE_PATH="."
+else
+    export MODULE_NAME
+    export MODULE_PATH="$MODULE_NAME"
+fi
 
 echo "Running semantic-release dry-run for module $MODULE_NAME"
 

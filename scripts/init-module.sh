@@ -13,10 +13,19 @@ if [ ! -d "$MODULE_NAME" ]; then
     exit 1
 fi
 
+# Handle root directory specially
+TAG_PREFIX=""
+if [ "$MODULE_NAME" = "." ]; then
+    echo "Initializing root module"
+    TAG_PREFIX="root"
+else
+    TAG_PREFIX="$MODULE_NAME"
+fi
+
 # Check if module has any tags
-if ! git tag -l "$MODULE_NAME/v*" | grep -q .; then
+if ! git tag -l "$TAG_PREFIX/v*" | grep -q .; then
     echo "Initializing module $MODULE_NAME with v0.0.0"
     # Create an initial tag if none exists
-    git tag -a "$MODULE_NAME/v0.0.0" -m "Initial version"
-    git push origin "$MODULE_NAME/v0.0.0"
+    git tag -a "$TAG_PREFIX/v0.0.0" -m "Initial version"
+    git push origin "$TAG_PREFIX/v0.0.0"
 fi 
