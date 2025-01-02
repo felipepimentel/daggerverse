@@ -10,7 +10,7 @@ require (
 	github.com/felipepimentel/daggerverse/python-publisher v0.0.0-00010101000000-000000000000
 	github.com/felipepimentel/daggerverse/python-versioner v0.0.0-00010101000000-000000000000
 	github.com/vektah/gqlparser/v2 v2.5.6
-	golang.org/x/sync v0.6.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -27,4 +27,4 @@ replace (
 	github.com/felipepimentel/daggerverse/python-builder => ../python-builder
 	github.com/felipepimentel/daggerverse/python-publisher => ../python-publisher
 	github.com/felipepimentel/daggerverse/python-versioner => ../python-versioner
-) 
+)
