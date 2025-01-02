@@ -105,10 +105,14 @@ Runs the complete CI/CD pipeline for a Python project. This includes:
 2. Running tests with pytest
 3. Running linting with pylint (if configured)
 4. Building the package
+5. Publishing to PyPI (if token is provided)
 
 ```bash
-# Run the CI/CD pipeline
+# Run the CI/CD pipeline without publishing
 dagger call cicd --source .
+
+# Run the CI/CD pipeline with publishing to PyPI
+dagger call cicd --source . --token env:PYPI_TOKEN
 ```
 
 ### BuildAndPublish

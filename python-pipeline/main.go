@@ -22,14 +22,16 @@ func New() *PythonPipeline {
 // 2. Running tests
 // 3. Running linting (if configured)
 // 4. Building the package
+// 5. Publishing to PyPI (if token is provided)
 //
 // Parameters:
 // - ctx: The context for the operation
 // - source: The source directory containing the Python project
+// - token: Optional PyPI token for publishing. If provided, the package will be published
 //
 // Returns:
 // - error: Any error that occurred during the process
-func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory) error {
+func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Setup Python container with Poetry
 	container := dag.Container().
 		From("python:3.11-slim").
@@ -55,9 +57,15 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory) err
 	}
 
 	// Build package
-	_, err = container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error building package: %v", err)
+	container = container.WithExec([]string{"poetry", "build"})
+
+	// If token is provided, publish to PyPI
+	if token != nil {
+		container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error publishing to PyPI: %v", err)
+		}
 	}
 
 	return nil
