@@ -72,7 +72,7 @@ if err != nil {
 
 ## Environment
 
-The module uses `python:3.11-slim` as the base image and automatically installs Poetry.
+The module uses `python:3.12-slim` as the base image and automatically installs Poetry.
 
 ## Example
 

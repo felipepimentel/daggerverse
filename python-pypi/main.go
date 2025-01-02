@@ -35,7 +35,7 @@ func (m *PythonPublisher) Publish(ctx context.Context, source *dagger.Directory,
 
 	// Setup Python container with Poetry
 	container := client.Container().
-		From("python:3.11-slim").
+		From("python:3.12-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
