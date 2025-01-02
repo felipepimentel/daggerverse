@@ -45,5 +45,5 @@ jobs:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
-          module: github.com/felipepimentel/daggerverse/python-pipeline
+          module: github.com/felipepimentel/daggerverse/python-pipeline@main
           args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN
