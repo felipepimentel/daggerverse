@@ -91,7 +91,7 @@ dagger call build-and-publish --source=. --token=env:PYPI_TOKEN
 
 The pipeline uses:
 
-- `python:3.11-slim` as base image
+- `python:3.12-slim` as base image
 - Poetry for package management
 - Automated PyPI authentication
 

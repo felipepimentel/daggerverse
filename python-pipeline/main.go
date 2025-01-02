@@ -34,7 +34,7 @@ func New() *PythonPipeline {
 func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Setup Python container with Poetry
 	container := dag.Container().
-		From("python:3.11-slim").
+		From("python:3.12-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
@@ -88,7 +88,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Setup Python container with Poetry
 	container := dag.Container().
-		From("python:3.11-slim").
+		From("python:3.12-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
@@ -126,7 +126,7 @@ func (m *PythonPipeline) BuildAndPublish(ctx context.Context, source *dagger.Dir
 func (m *PythonPipeline) UpdateDependencies(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	// Setup Python container with Poetry
 	container := dag.Container().
-		From("python:3.11-slim").
+		From("python:3.12-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
