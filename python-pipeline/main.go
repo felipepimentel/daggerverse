@@ -44,10 +44,16 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
-	// Verify pytest installation
-	_, err := container.WithExec([]string{"poetry", "run", "which", "pytest"}).Stdout(ctx)
+	// Run linting
+	_, err := container.WithExec([]string{"poetry", "run", "lint"}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("error verifying pytest installation: %v", err)
+		return fmt.Errorf("error running linting: %v", err)
+	}
+
+	// Run type checking
+	_, err = container.WithExec([]string{"poetry", "run", "typecheck"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running type checking: %v", err)
 	}
 
 	// Run tests
@@ -56,12 +62,16 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		return fmt.Errorf("error running tests: %v", err)
 	}
 
-	// Run linting if configured (looking for .pylintrc or setup.cfg)
-	if _, err := container.WithExec([]string{"test", "-f", ".pylintrc"}).Stdout(ctx); err == nil {
-		_, err := container.WithExec([]string{"poetry", "run", "pylint", "."}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error running linting: %v", err)
-		}
+	// Run format check
+	_, err = container.WithExec([]string{"poetry", "run", "format"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running format check: %v", err)
+	}
+
+	// Run final check
+	_, err = container.WithExec([]string{"poetry", "run", "check"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running final check: %v", err)
 	}
 
 	// If token is provided, publish to PyPI
