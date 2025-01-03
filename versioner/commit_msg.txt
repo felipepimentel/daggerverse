@@ -1,0 +1,13 @@
+refactor(global): enhance version bumping and retrieval process
+
+- Updated the BumpVersion method to utilize Dagger containers for version 
+  management, improving isolation and reproducibility.
+- Refactored GetCurrentVersion to also use Dagger containers, streamlining 
+  the process of retrieving the latest version tag.
+- Improved error handling and version parsing logic, ensuring robustness 
+  in version management.
+- Removed reliance on direct git command execution, enhancing compatibility 
+  and maintainability.
+
+These changes significantly improve the functionality and organization of 
+the versioning module.
