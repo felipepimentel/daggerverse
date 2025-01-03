@@ -40,12 +40,8 @@ cat > .releaserc.json << EOF
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
-    ["@semantic-release/exec", {
-      "prepareCmd": "poetry version \${nextRelease.version}",
-      "publishCmd": "git add pyproject.toml && git commit -m 'chore(release): bump version to \${nextRelease.version} [skip ci]' || true"
-    }],
     ["@semantic-release/git", {
-      "assets": ["CHANGELOG.md", "pyproject.toml"],
+      "assets": ["CHANGELOG.md"],
       "message": "chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}"
     }],
     "@semantic-release/github"
