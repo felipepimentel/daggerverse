@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dagger/python-pipeline/internal/dagger"
+	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
 
 // PythonPipeline orchestrates Python project workflows using Poetry and PyPI.
