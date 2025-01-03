@@ -44,8 +44,14 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
+	// Verify pytest installation
+	_, err := container.WithExec([]string{"poetry", "run", "which", "pytest"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error verifying pytest installation: %v", err)
+	}
+
 	// Run tests
-	_, err := container.WithExec([]string{"poetry", "run", "test"}).Stdout(ctx)
+	_, err = container.WithExec([]string{"poetry", "run", "test"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error running tests: %v", err)
 	}
