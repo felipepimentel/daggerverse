@@ -1,6 +1,0 @@
-chore(global): remove obsolete commit message file to streamline project structure
-
-- Deleted the commit_msg.txt file, which contained outdated information regarding
-  version bumping and retrieval processes.
-- This cleanup enhances the organization and maintainability of the repository
-  by eliminating unnecessary files.

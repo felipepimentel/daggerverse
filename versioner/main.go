@@ -17,7 +17,7 @@ func New() *Versioner {
 }
 
 // BumpVersion creates a new version tag based on the latest tag
-func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (*dagger.Container, error) {
+func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, outputVersion bool) (string, error) {
 	container := dag.Container().
 		From("alpine:latest").
 		WithDirectory("/src", source).
@@ -35,7 +35,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 		"git tag -l 'v*' | sort -V | tail -n 1",
 	}).Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting latest tag: %w", err)
+		return "", fmt.Errorf("error getting latest tag: %w", err)
 	}
 
 	var major, minor, patch int
@@ -47,7 +47,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
 		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing version: %w", err)
+			return "", fmt.Errorf("error parsing version: %w", err)
 		}
 
 		// Increment patch version
@@ -58,11 +58,18 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory) (
 	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
 
 	// Create new tag
-	container = container.WithExec([]string{
+	_, err = container.WithExec([]string{
 		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
-	})
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error creating tag: %w", err)
+	}
 
-	return container, nil
+	if outputVersion {
+		return strings.TrimPrefix(newTag, "v"), nil
+	}
+
+	return "", nil
 }
 
 // GetCurrentVersion returns the latest version tag in the repository

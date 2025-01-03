@@ -55,21 +55,72 @@ type(scope): subject
 
 ## Scopes
 
-- `go`: Changes to reusable Go modules
-  - New module creation
-  - Refactoring of existing modules
-  - Optimizations and bug fixes
-- `dagger`: Changes to Dagger workflows and configurations
-  - Updates in `.dagger/`
-  - CI/CD logic refinements
-  - Workflow automation enhancements
-- `internal`: Internal auto-generated components
-  - Handling of `dagger.gen.go`
-  - Updates to files in `internal/` (only regenerated via `dagger develop`)
-- `global`: Repository-wide changes
-  - Updates impacting multiple modules
-  - Adjustments to project structure
-  - Common configurations or standards
+The scope is mandatory and must be one of:
+
+### Language-specific Scopes
+
+- `python`: Changes related to Python modules and functionality
+- `nodejs`: Changes related to Node.js modules and functionality
+- `ruby`: Changes related to Ruby modules and functionality
+
+### Module-specific Scopes
+
+- `python-pipeline`: Changes related to the Python pipeline module
+- `python-poetry`: Changes related to the Python Poetry module
+- `python-pypi`: Changes related to the Python PyPI module
+- `versioner`: Changes related to the versioner module
+- Any new module name that follows the pattern `<language>-*` or represents a specific tool
+
+### General Scopes
+
+- `global`: Repository-wide changes or changes affecting multiple modules
+
+## Commit Message Rules
+
+1. **Subject Line:**
+
+   - Format: `type(scope): subject`
+   - Use the present tense (e.g., "Add feature", not "Added feature")
+   - Keep it concise (72 characters or fewer)
+   - Avoid ending with a period
+   - Scope is mandatory and must be one of: python, nodejs, ruby, global
+   - Example: `feat(python): add new testing pipeline`
+
+2. **Body:**
+
+   - Must be separated from subject by a blank line
+   - Each line must not exceed 100 characters
+   - Use bullet points (-) for multiple items
+   - Explain what and why, not how
+   - Break long lines with proper indentation for readability
+   - Example:
+
+     ```
+     feat(python): add new testing pipeline
+
+     - Implemented comprehensive test suite for Python packages with coverage
+       reporting and analysis.
+     - Added integration with popular testing frameworks to ensure
+       compatibility.
+     - Enhanced reporting capabilities to provide detailed test results and
+       metrics.
+     ```
+
+3. **Breaking Changes:**
+
+   - Add `!` after the type/scope: `feat(python)!: change API structure`
+   - Include `BREAKING CHANGE:` section in footer
+   - Example:
+
+     ```
+     feat(python)!: change testing API structure
+
+     - Redesigned test runner interface for better extensibility
+     - Added new configuration options for test environments
+
+     BREAKING CHANGE: The test runner now requires explicit configuration
+     file. See migration guide for details.
+     ```
 
 ## Protected Files and Directories
 
