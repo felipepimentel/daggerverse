@@ -3,61 +3,46 @@ package main
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
-
-	"dagger.io/dagger"
 )
 
-type Versioner struct {
-	dag *dagger.Client
-}
+type Versioner struct{}
 
-func New(c *dagger.Client) *Versioner {
-	return &Versioner{dag: c}
+func New() *Versioner {
+	return &Versioner{}
 }
 
 func (m *Versioner) BumpVersion(ctx context.Context, source string) (string, error) {
-	hostDir := m.dag.Host().Directory(source)
-	container := m.dag.Container().
-		From("alpine:latest").
-		WithDirectory("/src", hostDir).
-		WithWorkdir("/src").
-		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithExec([]string{"git", "config", "--global", "user.email", "dagger@example.com"}).
-		WithExec([]string{"git", "config", "--global", "user.name", "Dagger"})
-
 	// Get the latest tag
-	output, err := container.WithExec([]string{
-		"sh", "-c",
-		"git tag -l 'v*' | sort -V | tail -n 1",
-	}).Stdout(ctx)
+	cmd := exec.Command("git", "tag", "-l", "v*")
+	cmd.Dir = source
+	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error getting latest tag: %w", err)
 	}
 
-	var major, minor, patch int
-	if output == "" {
-		// No existing tag, start with v0.1.0
-		major, minor, patch = 0, 1, 0
+	// Parse version
+	tags := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var newTag string
+	if len(tags) == 0 || tags[0] == "" {
+		newTag = "v0.1.0"
 	} else {
-		// Parse existing version
-		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
+		latestTag := tags[len(tags)-1]
+		version := strings.TrimPrefix(latestTag, "v")
+		var major, minor, patch int
 		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
 		if err != nil {
 			return "", fmt.Errorf("error parsing version: %w", err)
 		}
-
-		// Increment patch version
 		patch++
+		newTag = fmt.Sprintf("v%d.%d.%d", major, minor, patch)
 	}
 
-	// Format new version tag
-	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
-
 	// Create new tag
-	_, err = container.WithExec([]string{
-		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
-	}).Sync(ctx)
+	cmd = exec.Command("git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag))
+	cmd.Dir = source
+	err = cmd.Run()
 	if err != nil {
 		return "", fmt.Errorf("error creating tag: %w", err)
 	}
@@ -66,20 +51,16 @@ func (m *Versioner) BumpVersion(ctx context.Context, source string) (string, err
 }
 
 func (m *Versioner) GetCurrentVersion(ctx context.Context, source string) (string, error) {
-	hostDir := m.dag.Host().Directory(source)
-	container := m.dag.Container().
-		From("alpine:latest").
-		WithDirectory("/src", hostDir).
-		WithWorkdir("/src").
-		WithExec([]string{"apk", "add", "--no-cache", "git"})
-
-	output, err := container.WithExec([]string{
-		"sh", "-c",
-		"git tag -l 'v*' | sort -V | tail -n 1",
-	}).Stdout(ctx)
+	cmd := exec.Command("git", "tag", "-l", "v*")
+	cmd.Dir = source
+	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error getting current version: %w", err)
 	}
 
-	return strings.TrimSpace(output), nil
+	tags := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(tags) == 0 || tags[0] == "" {
+		return "", nil
+	}
+	return tags[len(tags)-1], nil
 } 
