@@ -1,3 +1,13 @@
+## [1.11.1](https://github.com/felipepimentel/daggerverse/compare/v1.11.0...v1.11.1) (2025-01-03)
+
+
+### Bug Fixes
+
+* **global:** add poetry installation to ci workflow ([d635815](https://github.com/felipepimentel/daggerverse/commit/d6358157abc99b17fd6491d3a61e416028445d27))
+* **global:** improve version tag handling ([aedb999](https://github.com/felipepimentel/daggerverse/commit/aedb999c748004ee4b0a263dc0831a9f04dab1ba))
+* **global:** remove poetry steps from ci workflow ([5d96422](https://github.com/felipepimentel/daggerverse/commit/5d96422aba656d079a213f1459924270652bb349))
+* **global:** remove poetry-specific release steps ([cd8f0d7](https://github.com/felipepimentel/daggerverse/commit/cd8f0d7dfebbe69478b7d0a537dd673a3115107f))
+
 # [1.11.0](https://github.com/felipepimentel/daggerverse/compare/v1.10.0...v1.11.0) (2025-01-02)
 
 
