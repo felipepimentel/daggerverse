@@ -39,7 +39,14 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		From("python:3.12-slim").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
+		WithExec([]string{"apt-get", "update"}).
+		WithExec([]string{"apt-get", "install", "-y", "git"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
+
+	// Configure git
+	container = container.
+		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
