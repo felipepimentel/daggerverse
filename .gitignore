@@ -84,3 +84,5 @@ dagger.gen.go
 /internal/dagger
 /internal/querybuilder
 /internal/telemetry
+
+node_modules
