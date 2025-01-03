@@ -32,23 +32,6 @@ git pull --rebase origin main || {
     git clean -fd
 }
 
-# Create .releaserc.json for semantic-release configuration
-cat > .releaserc.json << EOF
-{
-  "branches": ["main"],
-  "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
-    "@semantic-release/changelog",
-    ["@semantic-release/git", {
-      "assets": ["CHANGELOG.md"],
-      "message": "chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}"
-    }],
-    "@semantic-release/github"
-  ]
-}
-EOF
-
 echo "Running semantic-release dry-run for module $MODULE_NAME"
 
 # Try dry-run first
