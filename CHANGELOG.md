@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/felipepimentel/daggerverse/compare/v1.11.1...v1.11.2) (2025-01-03)
+
+
+### Bug Fixes
+
+* **global:** use existing semantic-release config ([ef37245](https://github.com/felipepimentel/daggerverse/commit/ef372456dfb5009f493053ab522ec1731fb9e916))
+
 ## [1.11.1](https://github.com/felipepimentel/daggerverse/compare/v1.11.0...v1.11.1) (2025-01-03)
 
 
