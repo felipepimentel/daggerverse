@@ -45,7 +45,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
 	// Run tests
-	_, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
+	_, err := container.WithExec([]string{"poetry", "run", "test"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error running tests: %v", err)
 	}
