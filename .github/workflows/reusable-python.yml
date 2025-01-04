@@ -77,5 +77,5 @@ jobs:
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python-pipeline@main
-          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN --version env:VERSION
+          args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN
           version: ${{ inputs.dagger_version }}
