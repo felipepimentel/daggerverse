@@ -8,6 +8,11 @@ on:
         default: "."
         required: false
         type: string
+      dagger-version:
+        description: "Dagger version to use"
+        default: "0.9.8"
+        required: false
+        type: string
     secrets:
       PYPI_TOKEN:
         description: "PyPI token for publishing"
@@ -60,7 +65,7 @@ jobs:
           verb: call
           module: github.com/felipepimentel/daggerverse/versioner@main
           args: bump-version --source ${{ inputs.source-path }} --output-version
-          version: "0.9.8"
+          version: ${{ inputs.dagger-version }}
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
@@ -73,4 +78,4 @@ jobs:
           verb: call
           module: github.com/felipepimentel/daggerverse/python-pipeline@main
           args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN --version env:VERSION
-          version: "0.9.8"
+          version: ${{ inputs.dagger-version }}
