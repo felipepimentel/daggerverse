@@ -56,6 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
+          DAGGER_VERSION: "0.9.8"
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/versioner@main
@@ -68,6 +69,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
           VERSION: ${{ steps.versioner.outputs.version }}
+          DAGGER_VERSION: "0.9.8"
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python-pipeline@main
