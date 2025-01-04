@@ -56,11 +56,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-          DAGGER_VERSION: "0.9.8"
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/versioner@main
           args: bump-version --source ${{ inputs.source-path }} --output-version
+          version: "0.9.8"
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
@@ -69,8 +69,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
           VERSION: ${{ steps.versioner.outputs.version }}
-          DAGGER_VERSION: "0.9.8"
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/python-pipeline@main
           args: cicd --source ${{ inputs.source-path }} --token env:PYPI_TOKEN --version env:VERSION
+          version: "0.9.8"
