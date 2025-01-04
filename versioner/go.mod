@@ -1,6 +1,6 @@
 module github.com/felipepimentel/daggerverse/versioner
 
-go 1.22.0
+go 1.20
 
 require (
 
