@@ -1,8 +1,8 @@
 module github.com/felipepimentel/daggerverse/versioner
 
-go 1.22.7
+go 1.21
 
-toolchain go1.23.4
+require (
 
 require (
 	github.com/99designs/gqlgen v0.17.57
