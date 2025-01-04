@@ -20,6 +20,7 @@ permissions:
   pull-requests: write
   packages: write
   statuses: write
+  actions: read
 
 jobs:
   pipeline:
@@ -39,15 +40,22 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ github.token }}
+          persist-credentials: true
 
       - name: Configure Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global --add safe.directory '*'
+          git config --global core.sshCommand 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ${{ github.token }}"
 
       - name: Version Management
         id: versioner
         uses: dagger/dagger-for-github@v7
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           verb: call
           module: github.com/felipepimentel/daggerverse/versioner@main
