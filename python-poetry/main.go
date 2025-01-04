@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"dagger/python-poetry/internal/dagger"
+	"github.com/felipepimentel/daggerverse/python-poetry/internal/dagger"
 )
 
 // PythonPoetry handles Python project management with Poetry.
