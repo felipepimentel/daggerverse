@@ -63,7 +63,8 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		WithExec([]string{"git", "config", "--global", "http.retryCount", "3"}).
 		WithExec([]string{"git", "config", "--global", "http.retryDelay", "2"}).
 		WithExec([]string{"git", "config", "--global", "http.maxRequestBuffer", "100M"}).
-		WithExec([]string{"git", "config", "--global", "http.version", "HTTP/1.1"})
+		WithExec([]string{"git", "config", "--global", "http.version", "HTTP/1.1"}).
+		WithExec([]string{"git", "config", "--global", "http.keepAlive", "false"})
 
 	// Check if git is already initialized
 	gitStatus, err := container.WithExec([]string{"sh", "-c", "[ -d .git ] && echo 'true' || echo 'false'"}).Stdout(ctx)
@@ -168,7 +169,8 @@ func (m *Versioner) GetCurrentVersion(ctx context.Context, source *dagger.Direct
 		WithExec([]string{"git", "config", "--global", "http.retryCount", "3"}).
 		WithExec([]string{"git", "config", "--global", "http.retryDelay", "2"}).
 		WithExec([]string{"git", "config", "--global", "http.maxRequestBuffer", "100M"}).
-		WithExec([]string{"git", "config", "--global", "http.version", "HTTP/1.1"})
+		WithExec([]string{"git", "config", "--global", "http.version", "HTTP/1.1"}).
+		WithExec([]string{"git", "config", "--global", "http.keepAlive", "false"})
 
 	// Check if git is already initialized
 	gitStatus, err := container.WithExec([]string{"sh", "-c", "[ -d .git ] && echo 'true' || echo 'false'"}).Stdout(ctx)
