@@ -1,6 +1,8 @@
 module github.com/felipepimentel/daggerverse/versioner
 
-go 1.20
+go 1.22.7
+
+toolchain go1.23.4
 
 require (
 	github.com/99designs/gqlgen v0.17.57
@@ -41,7 +43,7 @@ require (
 	google.golang.org/protobuf v1.35.2 // indirect
 )
 
-replace dagger.io/dagger => github.com/dagger/dagger/sdk/go v0.9.8
+replace dagger.io/dagger => github.com/dagger/dagger/sdk/go v0.15.1
 
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88
 

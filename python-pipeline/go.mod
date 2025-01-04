@@ -1,6 +1,8 @@
 module github.com/felipepimentel/daggerverse/python-pipeline
 
-go 1.20
+go 1.22.7
+
+toolchain go1.23.4
 
 require (
 	github.com/99designs/gqlgen v0.17.62
@@ -41,6 +43,8 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241219192143-6b3ec007d9bb // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 )
+
+replace dagger.io/dagger => github.com/dagger/dagger/sdk/go v0.15.1
 
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88
 
