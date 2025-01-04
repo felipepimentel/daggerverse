@@ -3,8 +3,6 @@ module github.com/felipepimentel/daggerverse/python-pipeline
 go 1.20
 
 require (
-
-require (
 	github.com/99designs/gqlgen v0.17.62
 	github.com/Khan/genqlient v0.7.0
 	github.com/vektah/gqlparser/v2 v2.5.21
