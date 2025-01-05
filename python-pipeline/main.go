@@ -74,15 +74,19 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		// Install python-semantic-release
 		container = container.WithExec([]string{"pip", "install", "python-semantic-release"})
 
-		// Configure git
+		// Configure git and GitHub authentication
 		container = container.
 			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-		// Ensure repository is up to date
+		// Get GitHub token from environment
+		githubToken := dag.SetSecret("GITHUB_TOKEN", "")
+
+		// Ensure repository is up to date with authentication
 		container = container.
+			WithSecretVariable("GITHUB_TOKEN", githubToken).
 			WithExec([]string{"git", "remote", "set-url", "origin", 
-				"https://github.com/felipepimentel/pepperpy-core.git"}).
+				"https://x-access-token:${GITHUB_TOKEN}@github.com/felipepimentel/pepperpy-core.git"}).
 			WithExec([]string{"git", "fetch", "origin", "main"}).
 			WithExec([]string{"git", "reset", "--hard", "origin/main"})
 
@@ -107,7 +111,7 @@ EOF
 fi`})
 
 		// Set GH_TOKEN environment variable for semantic-release
-		container = container.WithEnvVariable("GH_TOKEN", "$GITHUB_TOKEN")
+		container = container.WithSecretVariable("GH_TOKEN", githubToken)
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
