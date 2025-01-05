@@ -82,7 +82,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		// Ensure repository is up to date
 		container = container.
 			WithExec([]string{"git", "remote", "set-url", "origin", 
-				fmt.Sprintf("https://%s@github.com/felipepimentel/pepperpy-core.git", "ghp_your_token_here")}).
+				"https://github.com/felipepimentel/pepperpy-core.git"}).
 			WithExec([]string{"git", "fetch", "origin", "main"}).
 			WithExec([]string{"git", "reset", "--hard", "origin/main"})
 
@@ -107,7 +107,7 @@ EOF
 fi`})
 
 		// Set GH_TOKEN environment variable for semantic-release
-		container = container.WithEnvVariable("GH_TOKEN", "ghp_your_token_here")
+		container = container.WithEnvVariable("GH_TOKEN", "$GITHUB_TOKEN")
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
