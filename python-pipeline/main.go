@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
@@ -80,57 +79,15 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-		// Run semantic release to determine version and create release
-		version, err := container.WithExec([]string{
+		// Run semantic-release publish to handle versioning and publishing
+		_, err = container.WithExec([]string{
 			"semantic-release",
-			"version",
-			"--print",
+			"publish",
+			"-D",
+			"commit_author=github-actions[bot] <github-actions[bot]@users.noreply.github.com>",
 		}).Stdout(ctx)
 		if err != nil {
-			return fmt.Errorf("error running semantic-release: %v", err)
-		}
-
-		// Clean version string (remove newline)
-		version = strings.TrimSpace(version)
-
-		// Get current version
-		currentVersion, err := container.WithExec([]string{"poetry", "version", "--short"}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error getting current version: %v", err)
-		}
-		currentVersion = strings.TrimSpace(currentVersion)
-
-		// Only update version if it's different
-		if version != currentVersion {
-			// Run semantic-release version to update files and create tag
-			_, err = container.WithExec([]string{
-				"semantic-release",
-				"version",
-			}).Stdout(ctx)
-			if err != nil {
-				return fmt.Errorf("error running semantic-release version: %v", err)
-			}
-
-			// Check if there are changes to commit
-			status, err := container.WithExec([]string{"git", "status", "--porcelain"}).Stdout(ctx)
-			if err != nil {
-				return fmt.Errorf("error checking git status: %v", err)
-			}
-
-			// Only commit if there are changes
-			if strings.TrimSpace(status) != "" {
-				container = container.
-					WithExec([]string{"git", "add", "."}).
-					WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", version)}).
-					WithExec([]string{"git", "push", "origin", "HEAD"})
-			}
-		}
-
-		// Build and publish using poetry
-		container = container.WithExec([]string{"poetry", "build"})
-		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error publishing to PyPI: %v", err)
+			return fmt.Errorf("error running semantic-release publish: %v", err)
 		}
 	}
 
