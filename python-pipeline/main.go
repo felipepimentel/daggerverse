@@ -51,10 +51,22 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
-	// Run final check
-	_, err := container.WithExec([]string{"poetry", "run", "check"}).Stdout(ctx)
+	// Run tests
+	_, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("error running final check: %v", err)
+		return fmt.Errorf("error running tests: %v", err)
+	}
+
+	// Run black check
+	_, err = container.WithExec([]string{"poetry", "run", "black", ".", "--check"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running black check: %v", err)
+	}
+
+	// Run ruff check
+	_, err = container.WithExec([]string{"poetry", "run", "ruff", "check", "."}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running ruff check: %v", err)
 	}
 
 	// If token is provided, publish to PyPI
