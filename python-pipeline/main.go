@@ -83,7 +83,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"publish",
-			"-D",
+			"--define",
 			"commit_author=github-actions[bot] <github-actions[bot]@users.noreply.github.com>",
 		}).Stdout(ctx)
 		if err != nil {
