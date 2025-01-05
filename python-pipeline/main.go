@@ -102,10 +102,13 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 		// Only update version if it's different
 		if version != currentVersion {
-			// Update version in pyproject.toml using poetry
-			_, err = container.WithExec([]string{"poetry", "version", version}).Stdout(ctx)
+			// Run semantic-release version to update files and create tag
+			_, err = container.WithExec([]string{
+				"semantic-release",
+				"version",
+			}).Stdout(ctx)
 			if err != nil {
-				return fmt.Errorf("error updating version in pyproject.toml: %v", err)
+				return fmt.Errorf("error running semantic-release version: %v", err)
 			}
 
 			// Check if there are changes to commit
@@ -117,7 +120,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			// Only commit if there are changes
 			if strings.TrimSpace(status) != "" {
 				container = container.
-					WithExec([]string{"git", "add", "pyproject.toml"}).
+					WithExec([]string{"git", "add", "."}).
 					WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", version)}).
 					WithExec([]string{"git", "push", "origin", "HEAD"})
 			}
