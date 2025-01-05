@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
@@ -89,17 +90,38 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			return fmt.Errorf("error running semantic-release: %v", err)
 		}
 
-		// Update version in pyproject.toml using poetry
-		_, err = container.WithExec([]string{"poetry", "version", version}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("error updating version in pyproject.toml: %v", err)
-		}
+		// Clean version string (remove newline)
+		version = strings.TrimSpace(version)
 
-		// Commit version change
-		container = container.
-			WithExec([]string{"git", "add", "pyproject.toml"}).
-			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", version)}).
-			WithExec([]string{"git", "push", "origin", "HEAD"})
+		// Get current version
+		currentVersion, err := container.WithExec([]string{"poetry", "version", "--short"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error getting current version: %v", err)
+		}
+		currentVersion = strings.TrimSpace(currentVersion)
+
+		// Only update version if it's different
+		if version != currentVersion {
+			// Update version in pyproject.toml using poetry
+			_, err = container.WithExec([]string{"poetry", "version", version}).Stdout(ctx)
+			if err != nil {
+				return fmt.Errorf("error updating version in pyproject.toml: %v", err)
+			}
+
+			// Check if there are changes to commit
+			status, err := container.WithExec([]string{"git", "status", "--porcelain"}).Stdout(ctx)
+			if err != nil {
+				return fmt.Errorf("error checking git status: %v", err)
+			}
+
+			// Only commit if there are changes
+			if strings.TrimSpace(status) != "" {
+				container = container.
+					WithExec([]string{"git", "add", "pyproject.toml"}).
+					WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", version)}).
+					WithExec([]string{"git", "push", "origin", "HEAD"})
+			}
+		}
 
 		// Build and publish using poetry
 		container = container.WithExec([]string{"poetry", "build"})
