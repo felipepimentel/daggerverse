@@ -118,13 +118,22 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			return fmt.Errorf("error updating version: %v", err)
 		}
 
-		// Commit version change
-		container = container.
-			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
-			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"}).
-			WithExec([]string{"git", "add", "pyproject.toml"}).
-			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", newVersion)}).
-			WithExec([]string{"git", "push", "origin", "HEAD"})
+		// Check if there are changes to commit
+		status, err := container.WithExec([]string{"git", "status", "--porcelain"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error checking git status: %v", err)
+		}
+
+		// Only commit if there are changes
+		if strings.TrimSpace(status) != "" {
+			// Commit version change
+			container = container.
+				WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+				WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"}).
+				WithExec([]string{"git", "add", "pyproject.toml"}).
+				WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", newVersion)}).
+				WithExec([]string{"git", "push", "origin", "HEAD"})
+		}
 
 		// Build package with new version
 		container = container.WithExec([]string{"poetry", "build"})
