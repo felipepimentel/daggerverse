@@ -79,6 +79,13 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
+		// Ensure repository is up to date
+		container = container.
+			WithExec([]string{"git", "remote", "set-url", "origin", 
+				fmt.Sprintf("https://%s@github.com/felipepimentel/pepperpy-core.git", "ghp_your_token_here")}).
+			WithExec([]string{"git", "fetch", "origin", "main"}).
+			WithExec([]string{"git", "reset", "--hard", "origin/main"})
+
 		// Create a backup of the original pyproject.toml
 		container = container.WithExec([]string{"cp", "pyproject.toml", "pyproject.toml.bak"})
 
