@@ -51,32 +51,8 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
-	// Run linting
-	_, err := container.WithExec([]string{"poetry", "run", "lint"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error running linting: %v", err)
-	}
-
-	// Run type checking
-	_, err = container.WithExec([]string{"poetry", "run", "typecheck"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error running type checking: %v", err)
-	}
-
-	// Run tests
-	_, err = container.WithExec([]string{"poetry", "run", "test"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error running tests: %v", err)
-	}
-
-	// Run format check
-	_, err = container.WithExec([]string{"poetry", "run", "format"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error running format check: %v", err)
-	}
-
 	// Run final check
-	_, err = container.WithExec([]string{"poetry", "run", "check"}).Stdout(ctx)
+	_, err := container.WithExec([]string{"poetry", "run", "check"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error running final check: %v", err)
 	}
