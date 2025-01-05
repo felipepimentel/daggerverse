@@ -80,7 +80,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
 		// Run semantic release to determine version and create release
-		_, err = container.WithExec([]string{
+		version, err := container.WithExec([]string{
 			"semantic-release",
 			"version",
 			"--print",
@@ -88,6 +88,18 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		if err != nil {
 			return fmt.Errorf("error running semantic-release: %v", err)
 		}
+
+		// Update version in pyproject.toml using poetry
+		_, err = container.WithExec([]string{"poetry", "version", version}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("error updating version in pyproject.toml: %v", err)
+		}
+
+		// Commit version change
+		container = container.
+			WithExec([]string{"git", "add", "pyproject.toml"}).
+			WithExec([]string{"git", "commit", "-m", fmt.Sprintf("chore(release): bump version to %s [skip ci]", version)}).
+			WithExec([]string{"git", "push", "origin", "HEAD"})
 
 		// Build and publish using poetry
 		container = container.WithExec([]string{"poetry", "build"})
