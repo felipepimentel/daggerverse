@@ -79,14 +79,25 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-		// Get GitHub token from environment
-		githubToken := dag.SetSecret("GITHUB_TOKEN", "")
+		// Get GitHub token from environment and set it for both GH_TOKEN and GITHUB_TOKEN
+		githubToken := dag.SetSecret("GH_TOKEN", "")
+		container = container.
+			WithSecretVariable("GH_TOKEN", githubToken).
+			WithSecretVariable("GITHUB_TOKEN", githubToken)
+
+		// Get repository info from git remote
+		container = container.WithExec([]string{"bash", "-c", `
+			REPO_URL=$(git config --get remote.origin.url)
+			REPO_NAME=$(basename -s .git "$REPO_URL")
+			REPO_OWNER=$(echo "$REPO_URL" | awk -F'/' '{print $(NF-1)}')
+			echo "REPO_NAME=$REPO_NAME" > /tmp/repo_info
+			echo "REPO_OWNER=$REPO_OWNER" >> /tmp/repo_info
+		`})
 
 		// Ensure repository is up to date with authentication
 		container = container.
-			WithSecretVariable("GITHUB_TOKEN", githubToken).
 			WithExec([]string{"git", "remote", "set-url", "origin", 
-				"https://x-access-token:${GITHUB_TOKEN}@github.com/felipepimentel/pepperpy-core.git"}).
+				"https://x-access-token:${GH_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"}).
 			WithExec([]string{"git", "fetch", "origin", "main"}).
 			WithExec([]string{"git", "reset", "--hard", "origin/main"})
 
@@ -95,8 +106,9 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 		// Add semantic-release config if it doesn't exist
 		container = container.WithExec([]string{"bash", "-c", `
+source /tmp/repo_info
 if ! grep -q "\[tool.semantic_release\]" pyproject.toml; then
-	cat >> pyproject.toml << 'EOF'
+	cat >> pyproject.toml << EOF
 
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
@@ -105,13 +117,10 @@ commit_parser = "angular"
 branch = "main"
 upload_to_pypi = true
 build_command = "poetry build"
-repository = "pepperpy-core"
-repository_owner = "felipepimentel"
+repository = "${REPO_NAME}"
+repository_owner = "${REPO_OWNER}"
 EOF
 fi`})
-
-		// Set GH_TOKEN environment variable for semantic-release
-		container = container.WithSecretVariable("GH_TOKEN", githubToken)
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
