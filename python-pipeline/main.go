@@ -94,13 +94,19 @@ commit_parser = "angular"
 branch = "main"
 upload_to_pypi = true
 build_command = "poetry build"
+repository = "pepperpy-core"
+repository_owner = "felipepimentel"
 EOF
 fi`})
+
+		// Set GH_TOKEN environment variable for semantic-release
+		container = container.WithEnvVariable("GH_TOKEN", "ghp_your_token_here")
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"version",
+			"--verbosity=DEBUG",
 		}).Stdout(ctx)
 		if err != nil {
 			// Restore original pyproject.toml if semantic-release fails
@@ -115,6 +121,7 @@ fi`})
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"publish",
+			"--verbosity=DEBUG",
 		}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error running semantic-release publish: %v", err)
