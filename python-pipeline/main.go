@@ -79,15 +79,15 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-		// Create semantic-release config
-		container = container.WithExec([]string{"bash", "-c", `cat > pyproject.toml << 'EOF'
+		// Add semantic-release config to pyproject.toml
+		container = container.WithExec([]string{"bash", "-c", `cat >> pyproject.toml << 'EOF'
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
 commit_author = "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
 commit_parser = "angular"
 branch = "main"
 upload_to_pypi = true
-build_command = "pip install poetry && poetry build"
+build_command = "poetry build"
 EOF`})
 
 		// Run semantic-release version to determine and update version
