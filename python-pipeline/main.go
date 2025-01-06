@@ -90,11 +90,13 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			REPO_NAME=${REPO_URL#*/}              # Get repo name
 			
 			# Configure git with token
-			git config --global credential.helper store
-			echo "https://x-access-token:$GITHUB_TOKEN@github.com" > ~/.git-credentials
+			git config --global user.email "github-actions[bot]@users.noreply.github.com"
+			git config --global user.name "github-actions[bot]"
 			git config --global --add safe.directory '*'
 			
-			git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
+			# Set up git remote with token
+			git remote remove origin
+			git remote add origin "https://$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
 			git reset --hard origin/main
 
@@ -142,8 +144,8 @@ EOF
 			export GH_TOKEN="$GITHUB_TOKEN"
 			export POETRY_PYPI_TOKEN_PYPI
 
-			# Test GitHub API access with bearer token
-			curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
+			# Test GitHub API access
+			curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME"
 		`})
 
 		// Run semantic-release version to determine and update version
