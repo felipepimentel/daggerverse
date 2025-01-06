@@ -71,8 +71,22 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 	// If token is provided, publish to PyPI
 	if token != nil {
+		tokenValue, err := token.Plaintext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read PYPI_TOKEN value: %w", err)
+		}
+
+		if tokenValue == "" {
+			return fmt.Errorf("PYPI_TOKEN is empty")
+		}
+
+		fmt.Printf("Using PYPI_TOKEN\n")
+
 		container = container.WithSecretVariable("PYPI_TOKEN", token)
-		container.WithExec([]string{"poetry", "publish", "--no-interaction"})
+		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to publish to PyPI: %w", err)
+		}
 	}
 
 	return nil
