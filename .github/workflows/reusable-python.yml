@@ -70,7 +70,6 @@ jobs:
           echo "Versioner Output: ${{ steps.versioner.outputs.version }}"
 
       - name: Set VERSION Environment Variable
-        id: set-version
         run: |
           echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
 
