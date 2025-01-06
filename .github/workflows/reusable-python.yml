@@ -65,14 +65,17 @@ jobs:
           args: bump-version --source ${{ inputs.source-path }} --output-version
           version: ${{ inputs.dagger_version }}
 
+      - name: Debug Versioner Output
+        run: |
+          echo "Versioner Output: ${{ steps.versioner.outputs.version }}"
+
       - name: Set VERSION Environment Variable
         id: set-version
-        run: echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Debug Version Output
         run: |
-          echo "Version: ${{ steps.versioner.outputs.version }}"
-          echo "Version: ${{ env.VERSION }}"
+          echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Debug Version Environment
+        run: |
           echo "Version: $VERSION"
 
       - name: Run Pipeline
