@@ -101,8 +101,10 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			# Create a backup of the original pyproject.toml
 			cp pyproject.toml pyproject.toml.bak
 
-			# Add semantic-release config
-			cat >> pyproject.toml << EOF
+			# Check if semantic-release config already exists
+			if ! grep -q "\[tool.semantic_release\]" pyproject.toml; then
+				# Add semantic-release config only if it doesn't exist
+				cat >> pyproject.toml << EOF
 
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
@@ -133,14 +135,15 @@ build = true
 remove_dist = true
 token = "\${POETRY_PYPI_TOKEN_PYPI}"
 EOF
+			fi
 
 			# Ensure the token is available in the environment
 			export GITHUB_TOKEN
 			export GH_TOKEN="$GITHUB_TOKEN"
 			export POETRY_PYPI_TOKEN_PYPI
 
-			# Test GitHub API access
-			curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user
+			# Test GitHub API access with bearer token
+			curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
 		`})
 
 		// Run semantic-release version to determine and update version
