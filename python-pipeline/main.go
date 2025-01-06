@@ -120,7 +120,7 @@ repository_owner = "$REPO_OWNER"
 
 [tool.semantic_release.remote]
 type = "github"
-token = "\${GITHUB_TOKEN}"
+token = "\${GH_TOKEN}"
 
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
@@ -140,12 +140,17 @@ EOF
 			fi
 
 			# Ensure the token is available in the environment
-			export GITHUB_TOKEN
 			export GH_TOKEN="$GITHUB_TOKEN"
+			export GITHUB_TOKEN
 			export POETRY_PYPI_TOKEN_PYPI
 
-			# Test GitHub API access
-			curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME"
+			# Configure git credentials
+			git config --global credential.helper store
+			echo "https://$GH_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials
+			chmod 600 ~/.git-credentials
+
+			# Test GitHub API access with basic auth
+			curl -u "$GH_TOKEN:x-oauth-basic" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME
 		`})
 
 		// Run semantic-release version to determine and update version
