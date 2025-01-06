@@ -80,7 +80,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
 		// Get GitHub token from environment and set it for both GH_TOKEN and GITHUB_TOKEN
-		githubToken := dag.SetSecret("GH_TOKEN", "")
+		githubToken := dag.SetSecret("GITHUB_TOKEN", "")
 		container = container.
 			WithSecretVariable("GH_TOKEN", githubToken).
 			WithSecretVariable("GITHUB_TOKEN", githubToken)
@@ -95,7 +95,11 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			REPO_NAME=${REPO_URL#*/}              # Get repo name
 			
 			# Configure git with token
-			git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
+			git config --global url."https://api:$GITHUB_TOKEN@github.com/".insteadOf "https://github.com/"
+			git config --global url."https://ssh:$GITHUB_TOKEN@github.com/".insteadOf "ssh://git@github.com/"
+			git config --global url."https://git:$GITHUB_TOKEN@github.com/".insteadOf "git@github.com:"
+			
+			git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
 			git reset --hard origin/main
 
@@ -117,7 +121,7 @@ repository_owner = "$REPO_OWNER"
 
 [tool.semantic_release.remote]
 type = "github"
-token = "\${GH_TOKEN}"
+token = "\${GITHUB_TOKEN}"
 
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
@@ -136,9 +140,12 @@ token = "\${POETRY_PYPI_TOKEN_PYPI}"
 EOF
 
 			# Ensure the token is available in the environment
-			export GH_TOKEN
-			export GITHUB_TOKEN="$GH_TOKEN"
+			export GITHUB_TOKEN
+			export GH_TOKEN="$GITHUB_TOKEN"
 			export POETRY_PYPI_TOKEN_PYPI
+
+			# Test GitHub API access
+			curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user
 		`})
 
 		// Run semantic-release version to determine and update version
