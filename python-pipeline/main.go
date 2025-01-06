@@ -38,7 +38,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"apt-get", "update"}).
-		WithExec([]string{"apt-get", "install", "-y", "git"}).
+		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "ca-certificates"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
 
 	// Configure git
@@ -74,18 +74,13 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		// Install python-semantic-release
 		container = container.WithExec([]string{"pip", "install", "python-semantic-release"})
 
-		// Configure git and GitHub authentication
-		container = container.
-			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
-			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
-
 		// Get GitHub token from environment and set it for both GH_TOKEN and GITHUB_TOKEN
 		githubToken := dag.SetSecret("GITHUB_TOKEN", "")
 		container = container.
 			WithSecretVariable("GH_TOKEN", githubToken).
 			WithSecretVariable("GITHUB_TOKEN", githubToken)
 
-		// Configure git with token and get repository info from GitHub environment
+		// Configure git with token and get repository info
 		container = container.WithExec([]string{"bash", "-c", `
 			# Get repository info from git remote
 			REPO_URL=$(git remote get-url origin)
@@ -95,9 +90,9 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			REPO_NAME=${REPO_URL#*/}              # Get repo name
 			
 			# Configure git with token
-			git config --global url."https://api:$GITHUB_TOKEN@github.com/".insteadOf "https://github.com/"
-			git config --global url."https://ssh:$GITHUB_TOKEN@github.com/".insteadOf "ssh://git@github.com/"
-			git config --global url."https://git:$GITHUB_TOKEN@github.com/".insteadOf "git@github.com:"
+			git config --global credential.helper store
+			echo "https://x-access-token:$GITHUB_TOKEN@github.com" > ~/.git-credentials
+			git config --global --add safe.directory '*'
 			
 			git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
