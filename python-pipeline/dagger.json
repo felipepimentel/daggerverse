@@ -4,14 +4,9 @@
   "sdk": "go",
   "dependencies": [
     {
-      "name": "python-poetry",
-      "source": "github.com/felipepimentel/daggerverse/python-poetry",
-      "pin": "2b64ede44c124ef76c5a5644d9d7a6dfc34a734f"
-    },
-    {
-      "name": "python-pypi",
-      "source": "github.com/felipepimentel/daggerverse/python-pypi",
-      "pin": "2b64ede44c124ef76c5a5644d9d7a6dfc34a734f"
+      "name": "versioner",
+      "source": "../versioner",
+      "pin": ""
     }
   ],
   "source": "."

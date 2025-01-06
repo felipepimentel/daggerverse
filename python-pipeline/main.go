@@ -1,9 +1,9 @@
+// Package main provides a complete pipeline for Python projects using Poetry and PyPI.
 package main
 
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
@@ -18,12 +18,6 @@ func New() *PythonPipeline {
 
 // CICD runs the complete CI/CD pipeline for a Python project.
 func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
-	// Retrieve version from environment variable
-	version := os.Getenv("VERSION")
-	if version == "" {
-		return fmt.Errorf("VERSION environment variable is not set")
-	}
-
 	// Setup Python container with Poetry
 	container := dag.Container().
 		From("python:3.12-slim").
@@ -38,39 +32,48 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-	// Ensure pyproject.toml is correctly configured
-	container = container.WithExec([]string{"bash", "-c", fmt.Sprintf(`
-		if ! grep -q "[tool.semantic_release]" pyproject.toml; then
-			echo "Adding semantic-release configuration to pyproject.toml"
-			cat >> pyproject.toml <<EOL
+	// Call the versioner module to get the next version
+	versionerModule := dag.Versioner()
+	versionOutput, err := versionerModule.BumpVersion(ctx, source, true)
+	if err != nil {
+		return fmt.Errorf("error running versioner module: %w", err)
+	}
 
-[tool.semantic_release]
-version_variables = ["pyproject.toml:version"]
-commit_author = "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-commit_parser = "angular"
-branch = "main"
-upload_to_pypi = true
-build_command = "poetry build"
-EOL
-		fi
-		echo "Setting version in pyproject.toml"
-		sed -i 's/version = ".*"/version = "%s"/' pyproject.toml
-	`, version)})
+	version, ok := versionOutput.(string)
+	if !ok || version == "" {
+		return fmt.Errorf("invalid version returned from versioner module")
+	}
+
+	fmt.Printf("Using version: %s\n", version)
+
+	// Pass version as an environment variable for subsequent steps
+	container = container.WithEnvVariable("VERSION", version)
 
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
 
 	// Run tests
-	_, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
+	_, err = container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error running tests: %v", err)
 	}
 
-	// Build and publish package
-	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
-	_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
+	// Run black check
+	_, err = container.WithExec([]string{"poetry", "run", "black", ".", "--check"}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("error publishing to PyPI: %v", err)
+		return fmt.Errorf("error running black check: %v", err)
+	}
+
+	// Run ruff check
+	_, err = container.WithExec([]string{"poetry", "run", "ruff", "check", "."}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("error running ruff check: %v", err)
+	}
+
+	// If token is provided, publish to PyPI
+	if token != nil {
+		container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+		container = container.WithExec([]string{"poetry", "publish", "--no-interaction"})
 	}
 
 	return nil

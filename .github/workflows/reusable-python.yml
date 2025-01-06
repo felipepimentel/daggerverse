@@ -30,16 +30,6 @@ permissions:
 jobs:
   pipeline:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      id-token: write
-      issues: write
-      pull-requests: write
-      packages: write
-      statuses: write
-      actions: read
-    outputs:
-      version: ${{ steps.versioner.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,37 +37,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
-      - name: Configure Git
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git config --global --add safe.directory '*'
-
-      - name: Version Management
-        id: versioner
+      - name: Run Python Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          verb: call
-          module: github.com/felipepimentel/daggerverse/versioner@main
-          args: bump-version --source ${{ inputs.source-path }} --output-version
-          version: ${{ inputs.dagger_version }}
-
-      - name: Set VERSION Environment Variable
-        run: echo "version=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
-
-      - name: Debug VERSION Value
-        run: |
-          echo "VERSION value is: $VERSION"
-        env:
-          VERSION: ${{ steps.versioner.outputs.version }}
-
-      - name: Run Pipeline
-        uses: dagger/dagger-for-github@v7
-        env:
-          VERSION: ${{ steps.versioner.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
