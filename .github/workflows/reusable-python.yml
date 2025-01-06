@@ -30,6 +30,14 @@ permissions:
 jobs:
   pipeline:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
+      packages: write
+      statuses: write
+      actions: read
     outputs:
       version: ${{ steps.versioner.outputs.version }}
     steps:
@@ -49,6 +57,7 @@ jobs:
         id: versioner
         uses: dagger/dagger-for-github@v7
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           verb: call
@@ -59,8 +68,8 @@ jobs:
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          VERSION: ${{ steps.versioner.outputs.version }} # Define a versão como variável de ambiente
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.versioner.outputs.version }} # Certifica que VERSION está configurada
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
