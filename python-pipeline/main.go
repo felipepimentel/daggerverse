@@ -117,11 +117,12 @@ repository_owner = "$REPO_OWNER"
 
 [tool.semantic_release.remote]
 type = "github"
-token = "$GH_TOKEN"
+token = "\${GH_TOKEN}"
 
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
 upload_to_vcs_release = true
+upload_to_repository = true
 
 [tool.semantic_release.branches.main]
 match = "main"
@@ -131,14 +132,20 @@ prerelease = false
 [tool.semantic_release.publish.pypi]
 build = true
 remove_dist = true
-token = "$POETRY_PYPI_TOKEN_PYPI"
+token = "\${POETRY_PYPI_TOKEN_PYPI}"
 EOF
+
+			# Ensure the token is available in the environment
+			export GH_TOKEN
+			export GITHUB_TOKEN="$GH_TOKEN"
+			export POETRY_PYPI_TOKEN_PYPI
 		`})
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"version",
+			"--noop",  // Dry run to get the version
 		}).Stdout(ctx)
 		if err != nil {
 			// Restore original pyproject.toml if semantic-release fails
@@ -153,6 +160,7 @@ EOF
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"publish",
+			"--verbosity=DEBUG",  // Add debug output to see what's happening
 		}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error running semantic-release publish: %v", err)
