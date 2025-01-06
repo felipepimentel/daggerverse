@@ -77,6 +77,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		// Get GitHub token from environment
 		githubToken := dag.SetSecret("GH_TOKEN", "")
 		container = container.WithSecretVariable("GH_TOKEN", githubToken)
+		container = container.WithSecretVariable("GITHUB_TOKEN", githubToken)
 
 		// Configure git with token and get repository info
 		container = container.WithExec([]string{"bash", "-c", `
@@ -93,8 +94,8 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			git config --global --add safe.directory '*'
 			
 			# Set up git remote with token
-			git remote remove origin
-			git remote add origin "https://$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
+			git remote remove origin || true
+			git remote add origin "https://$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
 			git reset --hard origin/main
 
@@ -118,7 +119,7 @@ repository_owner = "$REPO_OWNER"
 
 [tool.semantic_release.remote]
 type = "github"
-token = "\${GH_TOKEN}"
+token = "\${GITHUB_TOKEN}"
 
 [tool.semantic_release.publish]
 dist_glob_patterns = ["dist/*"]
@@ -139,15 +140,16 @@ EOF
 
 			# Ensure the token is available in the environment
 			export GH_TOKEN
+			export GITHUB_TOKEN
 			export POETRY_PYPI_TOKEN_PYPI
 
 			# Configure git credentials
 			git config --global credential.helper store
-			echo "https://$GH_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials
+			echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials
 			chmod 600 ~/.git-credentials
 
 			# Test GitHub API access with basic auth
-			curl -u "$GH_TOKEN:x-oauth-basic" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME
+			curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME
 		`})
 
 		// Run semantic-release version to determine and update version
