@@ -85,31 +85,22 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithSecretVariable("GH_TOKEN", githubToken).
 			WithSecretVariable("GITHUB_TOKEN", githubToken)
 
-		// Get repository info from git remote and set up authentication
+		// Configure git with token and get repository info from GitHub environment
 		container = container.WithExec([]string{"bash", "-c", `
-			# Get repository info
-			REPO_URL=$(git config --get remote.origin.url)
-			REPO_NAME=$(basename -s .git "$REPO_URL")
-			REPO_OWNER=$(echo "$REPO_URL" | awk -F'/' '{print $(NF-1)}')
-			
-			# Store for later use
-			echo "REPO_NAME=$REPO_NAME" > /tmp/repo_info
-			echo "REPO_OWNER=$REPO_OWNER" >> /tmp/repo_info
+			# Get repository info from GitHub environment
+			REPO_NAME=${GITHUB_REPOSITORY#*/}
+			REPO_OWNER=${GITHUB_REPOSITORY%/*}
 			
 			# Configure git with token
 			git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
 			git reset --hard origin/main
-		`})
 
-		// Create a backup of the original pyproject.toml
-		container = container.WithExec([]string{"cp", "pyproject.toml", "pyproject.toml.bak"})
+			# Create a backup of the original pyproject.toml
+			cp pyproject.toml pyproject.toml.bak
 
-		// Add semantic-release config if it doesn't exist
-		container = container.WithExec([]string{"bash", "-c", `
-			source /tmp/repo_info
-			if ! grep -q "\[tool.semantic_release\]" pyproject.toml; then
-				cat >> pyproject.toml << EOF
+			# Add semantic-release config
+			cat >> pyproject.toml << EOF
 
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
@@ -139,7 +130,6 @@ build = true
 remove_dist = true
 token = "$POETRY_PYPI_TOKEN_PYPI"
 EOF
-			fi
 		`})
 
 		// Run semantic-release version to determine and update version
