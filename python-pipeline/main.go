@@ -75,9 +75,9 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		container = container.WithExec([]string{"pip", "install", "python-semantic-release"})
 
 		// Get GitHub token from environment
-		githubToken := dag.SetSecret("GH_TOKEN", "")
-		container = container.WithSecretVariable("GH_TOKEN", githubToken)
+		githubToken := dag.SetSecret("GITHUB_TOKEN", "")  // Primary token
 		container = container.WithSecretVariable("GITHUB_TOKEN", githubToken)
+		container = container.WithSecretVariable("GH_TOKEN", githubToken)  // Backwards compatibility
 
 		// Configure git with token and get repository info
 		container = container.WithExec([]string{"bash", "-c", `
@@ -92,6 +92,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			git config --global user.email "github-actions[bot]@users.noreply.github.com"
 			git config --global user.name "github-actions[bot]"
 			git config --global --add safe.directory '*'
+			git config --global credential.helper store
 			
 			# Set up git remote with token
 			git remote remove origin || true
@@ -139,17 +140,16 @@ EOF
 			fi
 
 			# Ensure the token is available in the environment
-			export GH_TOKEN
 			export GITHUB_TOKEN
+			export GH_TOKEN="$GITHUB_TOKEN"
 			export POETRY_PYPI_TOKEN_PYPI
 
-			# Configure git credentials
-			git config --global credential.helper store
-			echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials
+			# Configure git credentials and test API access
+			echo "https://$GITHUB_TOKEN@github.com" > ~/.git-credentials
 			chmod 600 ~/.git-credentials
-
-			# Test GitHub API access with basic auth
-			curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME
+			
+			# Test GitHub API access with token header
+			curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME
 		`})
 
 		// Run semantic-release version to determine and update version
