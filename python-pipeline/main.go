@@ -85,30 +85,31 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			WithSecretVariable("GH_TOKEN", githubToken).
 			WithSecretVariable("GITHUB_TOKEN", githubToken)
 
-		// Get repository info from git remote
+		// Get repository info from git remote and set up authentication
 		container = container.WithExec([]string{"bash", "-c", `
+			# Get repository info
 			REPO_URL=$(git config --get remote.origin.url)
 			REPO_NAME=$(basename -s .git "$REPO_URL")
 			REPO_OWNER=$(echo "$REPO_URL" | awk -F'/' '{print $(NF-1)}')
+			
+			# Store for later use
 			echo "REPO_NAME=$REPO_NAME" > /tmp/repo_info
 			echo "REPO_OWNER=$REPO_OWNER" >> /tmp/repo_info
+			
+			# Configure git with token
+			git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
+			git fetch origin main
+			git reset --hard origin/main
 		`})
-
-		// Ensure repository is up to date with authentication
-		container = container.
-			WithExec([]string{"git", "remote", "set-url", "origin", 
-				"https://x-access-token:${GH_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"}).
-			WithExec([]string{"git", "fetch", "origin", "main"}).
-			WithExec([]string{"git", "reset", "--hard", "origin/main"})
 
 		// Create a backup of the original pyproject.toml
 		container = container.WithExec([]string{"cp", "pyproject.toml", "pyproject.toml.bak"})
 
 		// Add semantic-release config if it doesn't exist
 		container = container.WithExec([]string{"bash", "-c", `
-source /tmp/repo_info
-if ! grep -q "\[tool.semantic_release\]" pyproject.toml; then
-	cat >> pyproject.toml << EOF
+			source /tmp/repo_info
+			if ! grep -q "\[tool.semantic_release\]" pyproject.toml; then
+				cat >> pyproject.toml << EOF
 
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
@@ -117,10 +118,11 @@ commit_parser = "angular"
 branch = "main"
 upload_to_pypi = true
 build_command = "poetry build"
-repository = "${REPO_NAME}"
-repository_owner = "${REPO_OWNER}"
+repository = "$REPO_NAME"
+repository_owner = "$REPO_OWNER"
 EOF
-fi`})
+			fi
+		`})
 
 		// Run semantic-release version to determine and update version
 		_, err = container.WithExec([]string{
