@@ -79,15 +79,16 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error creating tag: %w", err)
 	}
 
-	// Push changes and tag to remote
-	_, err = container.WithExec([]string{"git", "push", "origin", "main"}).Stdout(ctx)
+	// Push branch and ensure sync with remote
+	_, err = container.WithExec([]string{"git", "push", "--set-upstream", "origin", "main"}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error pushing branch to remote: %w", err)
 	}
 
-	_, err = container.WithExec([]string{"git", "push", "origin", newTag}).Stdout(ctx)
+	// Push all tags to remote
+	_, err = container.WithExec([]string{"git", "push", "origin", "--tags"}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error pushing tag to remote: %w", err)
+		return "", fmt.Errorf("error pushing tags to remote: %w", err)
 	}
 
 	if outputVersion {
