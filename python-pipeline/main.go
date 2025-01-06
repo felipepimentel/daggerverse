@@ -74,11 +74,9 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		// Install python-semantic-release
 		container = container.WithExec([]string{"pip", "install", "python-semantic-release"})
 
-		// Get GitHub token from environment and set it for both GH_TOKEN and GITHUB_TOKEN
-		githubToken := dag.SetSecret("GITHUB_TOKEN", "")
-		container = container.
-			WithSecretVariable("GH_TOKEN", githubToken).
-			WithSecretVariable("GITHUB_TOKEN", githubToken)
+		// Get GitHub token from environment
+		githubToken := dag.SetSecret("GH_TOKEN", "")
+		container = container.WithSecretVariable("GH_TOKEN", githubToken)
 
 		// Configure git with token and get repository info
 		container = container.WithExec([]string{"bash", "-c", `
@@ -96,7 +94,7 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			
 			# Set up git remote with token
 			git remote remove origin
-			git remote add origin "https://$GITHUB_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
+			git remote add origin "https://$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
 			git fetch origin main
 			git reset --hard origin/main
 
@@ -140,8 +138,7 @@ EOF
 			fi
 
 			# Ensure the token is available in the environment
-			export GH_TOKEN="$GITHUB_TOKEN"
-			export GITHUB_TOKEN
+			export GH_TOKEN
 			export POETRY_PYPI_TOKEN_PYPI
 
 			# Configure git credentials
