@@ -92,6 +92,12 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 			return fmt.Errorf("failed to build the package: %w", err)
 		}
 
+		// Validate the presence of built artifacts
+		_, err = container.WithExec([]string{"ls", "-l", "dist/"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("artifacts not found in dist/: %w", err)
+		}
+
 		// Publish the package to PyPI
 		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
