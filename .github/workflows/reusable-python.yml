@@ -59,7 +59,7 @@ jobs:
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          VERSION: ${{ steps.versioner.outputs.version }}
+          VERSION: ${{ steps.versioner.outputs.version }} # Define a versão como variável de ambiente
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:

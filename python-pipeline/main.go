@@ -1,4 +1,3 @@
-// Package main provides a complete pipeline for Python projects using Poetry and PyPI.
 package main
 
 import (
@@ -40,16 +39,23 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
 	// Ensure pyproject.toml is correctly configured
-	container = container.WithExec([]string{"bash", "-c", `
+	container = container.WithExec([]string{"bash", "-c", fmt.Sprintf(`
 		if ! grep -q "[tool.semantic_release]" pyproject.toml; then
 			echo "Adding semantic-release configuration to pyproject.toml"
 			cat >> pyproject.toml <<EOL
 
 [tool.semantic_release]
 version_variables = ["pyproject.toml:version"]
+commit_author = "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+commit_parser = "angular"
+branch = "main"
+upload_to_pypi = true
+build_command = "poetry build"
 EOL
 		fi
-	`})
+		echo "Setting version in pyproject.toml"
+		sed -i 's/version = ".*"/version = "%s"/' pyproject.toml
+	`, version)})
 
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
