@@ -71,8 +71,8 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 	// If token is provided, publish to PyPI
 	if token != nil {
-		container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
-		container = container.WithExec([]string{"poetry", "publish", "--no-interaction"})
+		container = container.WithSecretVariable("PYPI_TOKEN", token)
+		container.WithExec([]string{"poetry", "publish", "--no-interaction"})
 	}
 
 	return nil
