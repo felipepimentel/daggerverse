@@ -145,7 +145,7 @@ EOF
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"version",
-			"--noop",  // Dry run to get the version
+			"--print",  // Just print the version without making changes
 		}).Stdout(ctx)
 		if err != nil {
 			// Restore original pyproject.toml if semantic-release fails
