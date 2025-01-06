@@ -145,7 +145,7 @@ EOF
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"version",
-			"--print",  // Just print the version without making changes
+			"--patch",  // Force a patch version increment
 		}).Stdout(ctx)
 		if err != nil {
 			// Restore original pyproject.toml if semantic-release fails
@@ -160,7 +160,6 @@ EOF
 		_, err = container.WithExec([]string{
 			"semantic-release",
 			"publish",
-			"--verbosity=DEBUG",  // Add debug output to see what's happening
 		}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("error running semantic-release publish: %v", err)
