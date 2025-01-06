@@ -120,6 +120,24 @@ upload_to_pypi = true
 build_command = "poetry build"
 repository = "$REPO_NAME"
 repository_owner = "$REPO_OWNER"
+
+[tool.semantic_release.remote]
+type = "github"
+token = "$GH_TOKEN"
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease_token = "rc"
+prerelease = false
+
+[tool.semantic_release.publish.pypi]
+build = true
+remove_dist = true
+token = "$POETRY_PYPI_TOKEN_PYPI"
 EOF
 			fi
 		`})
