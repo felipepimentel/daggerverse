@@ -87,9 +87,12 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 		// Configure git with token and get repository info from GitHub environment
 		container = container.WithExec([]string{"bash", "-c", `
-			# Get repository info from GitHub environment
-			REPO_NAME=${GITHUB_REPOSITORY#*/}
-			REPO_OWNER=${GITHUB_REPOSITORY%/*}
+			# Get repository info from git remote
+			REPO_URL=$(git remote get-url origin)
+			REPO_URL=${REPO_URL#*github.com[/:]}  # Remove everything before github.com
+			REPO_URL=${REPO_URL%.git}             # Remove .git suffix
+			REPO_OWNER=${REPO_URL%/*}             # Get owner
+			REPO_NAME=${REPO_URL#*/}              # Get repo name
 			
 			# Configure git with token
 			git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$REPO_OWNER/$REPO_NAME.git"
