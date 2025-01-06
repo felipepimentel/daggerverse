@@ -87,22 +87,20 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		container = container.WithSecretVariable("PYPI_TOKEN", token)
 
 		// Build the package before publishing
-		_, err = container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
+		buildResult, err := container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to build the package: %w", err)
+			return fmt.Errorf("failed to build the package: %w\nBuild output: %s", err, buildResult)
 		}
 
-		// Validate the presence of built artifacts
-		_, err = container.WithExec([]string{"ls", "-l", "dist/"}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("artifacts not found in dist/: %w", err)
-		}
+		fmt.Printf("Build output: %s\n", buildResult)
 
 		// Publish the package to PyPI
-		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
+		publishResult, err := container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to publish to PyPI: %w", err)
+			return fmt.Errorf("failed to publish to PyPI: %w\nPublish output: %s", err, publishResult)
 		}
+
+		fmt.Printf("Publish output: %s\n", publishResult)
 	}
 
 	return nil
