@@ -28,7 +28,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 	container = container.WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-	// Check if git is already initialized
+	// Ensure repository is initialized
 	gitStatus, err := container.WithExec([]string{"sh", "-c", "[ -d .git ] && echo 'true' || echo 'false'"}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error checking git status: %w", err)
@@ -41,6 +41,9 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 			WithExec([]string{"git", "commit", "-m", "Initial commit"})
 	}
 
+	// Ensure branch and commits are pushed
+	container = container.WithExec([]string{"git", "push", "origin", "main"})
+
 	// Get the latest tag
 	output, err := container.WithExec([]string{
 		"sh", "-c",
@@ -52,24 +55,18 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 
 	var major, minor, patch int
 	if output == "" {
-		// No existing tag, start with v0.1.0
 		major, minor, patch = 0, 1, 0
 	} else {
-		// Parse existing version
 		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
 		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
 		if err != nil {
 			return "", fmt.Errorf("error parsing version: %w", err)
 		}
-
-		// Increment patch version
 		patch++
 	}
 
-	// Format new version tag
+	// Create new tag
 	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
-
-	// Create and push new tag
 	_, err = container.WithExec([]string{
 		"git", "tag", "-a", newTag, "-m", fmt.Sprintf("Release %s", newTag),
 	}).Stdout(ctx)
@@ -77,13 +74,13 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error creating tag: %w", err)
 	}
 
+	// Push tag to remote
+	_, err = container.WithExec([]string{"git", "push", "origin", newTag}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error pushing tag to remote: %w", err)
+	}
+
 	if outputVersion {
-		_, err = container.WithExec([]string{
-			"git", "push", "origin", newTag,
-		}).Stdout(ctx)
-		if err != nil {
-			return "", fmt.Errorf("error pushing tag to remote: %w", err)
-		}
 		return strings.TrimPrefix(newTag, "v"), nil
 	}
 
