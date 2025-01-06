@@ -65,11 +65,15 @@ jobs:
           args: bump-version --source ${{ inputs.source-path }} --output-version
           version: ${{ inputs.dagger_version }}
 
+      - name: Debug Version Output
+        run: |
+          echo "Version: ${{ steps.versioner.outputs.version }}"
+
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          VERSION: ${{ steps.versioner.outputs.version }} # Certifica que VERSION está configurada
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.versioner.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
