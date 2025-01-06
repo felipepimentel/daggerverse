@@ -73,21 +73,24 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	if token != nil {
 		tokenValue, err := token.Plaintext(ctx)
 		if err != nil {
+			fmt.Println("Error reading PYPI_TOKEN from environment:", err)
 			return fmt.Errorf("failed to read PYPI_TOKEN value: %w", err)
 		}
-
+	
 		if tokenValue == "" {
+			fmt.Println("PYPI_TOKEN is set but empty")
 			return fmt.Errorf("PYPI_TOKEN is empty")
 		}
-
-		fmt.Printf("Using PYPI_TOKEN\n")
-
+	
+		fmt.Printf("Successfully read PYPI_TOKEN: %s\n", tokenValue[:5]) // Exibe apenas os primeiros 5 caracteres
+	
 		container = container.WithSecretVariable("PYPI_TOKEN", token)
 		_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to publish to PyPI: %w", err)
 		}
 	}
+	
 
 	return nil
 }
