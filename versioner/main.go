@@ -37,12 +37,17 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 	if strings.TrimSpace(gitStatus) == "false" {
 		container = container.
 			WithExec([]string{"git", "init"}).
+			WithExec([]string{"git", "remote", "add", "origin", "https://<username>:<token>@github.com/<user>/<repo>.git"}).
+			WithExec([]string{"git", "fetch", "origin"}).
+			WithExec([]string{"git", "checkout", "-b", "main"}).
+			WithExec([]string{"git", "pull", "--rebase", "origin", "main"}).
 			WithExec([]string{"git", "add", "."}).
 			WithExec([]string{"git", "commit", "-m", "Initial commit"})
+	} else {
+		// Sync with remote branch
+		container = container.WithExec([]string{"git", "fetch", "origin"}).
+			WithExec([]string{"git", "pull", "--rebase", "origin", "main"})
 	}
-
-	// Ensure branch and commits are pushed
-	container = container.WithExec([]string{"git", "push", "origin", "main"})
 
 	// Get the latest tag
 	output, err := container.WithExec([]string{
@@ -74,7 +79,12 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error creating tag: %w", err)
 	}
 
-	// Push tag to remote
+	// Push changes and tag to remote
+	_, err = container.WithExec([]string{"git", "push", "origin", "main"}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error pushing branch to remote: %w", err)
+	}
+
 	_, err = container.WithExec([]string{"git", "push", "origin", newTag}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error pushing tag to remote: %w", err)
