@@ -65,14 +65,20 @@ jobs:
           args: bump-version --source ${{ inputs.source-path }} --output-version
           version: ${{ inputs.dagger_version }}
 
+      - name: Set VERSION Environment Variable
+        id: set-version
+        run: echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
+
       - name: Debug Version Output
         run: |
           echo "Version: ${{ steps.versioner.outputs.version }}"
+          echo "Version: ${{ env.VERSION }}"
+          echo "Version: $VERSION"
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          VERSION: ${{ steps.versioner.outputs.version }}
+          VERSION: ${{ env.VERSION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
