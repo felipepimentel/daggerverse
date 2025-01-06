@@ -34,13 +34,12 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 	// Call the versioner module to get the next version
 	versionerModule := dag.Versioner()
-	versionOutput, err := versionerModule.BumpVersion(ctx, source, true)
+	version, err := versionerModule.BumpVersion(ctx, source, true)
 	if err != nil {
 		return fmt.Errorf("error running versioner module: %w", err)
 	}
 
-	version, ok := versionOutput.(string)
-	if !ok || version == "" {
+	if version == "" {
 		return fmt.Errorf("invalid version returned from versioner module")
 	}
 

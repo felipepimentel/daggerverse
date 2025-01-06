@@ -5,8 +5,7 @@
   "dependencies": [
     {
       "name": "versioner",
-      "source": "../versioner",
-      "pin": ""
+      "source": "../versioner"
     }
   ],
   "source": "."
