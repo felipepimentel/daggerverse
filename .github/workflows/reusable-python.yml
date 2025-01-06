@@ -38,6 +38,8 @@ jobs:
       packages: write
       statuses: write
       actions: read
+    outputs:
+      version: ${{ steps.versioner.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,12 +66,13 @@ jobs:
           version: ${{ inputs.dagger_version }}
 
       - name: Set VERSION Environment Variable
-        run: |
-          echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
+        run: echo "version=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
 
       - name: Debug VERSION Value
         run: |
           echo "VERSION value is: $VERSION"
+        env:
+          VERSION: ${{ steps.versioner.outputs.version }}
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
