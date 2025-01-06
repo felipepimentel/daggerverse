@@ -38,8 +38,6 @@ jobs:
       packages: write
       statuses: write
       actions: read
-    outputs:
-      version: ${{ steps.versioner.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,22 +63,18 @@ jobs:
           args: bump-version --source ${{ inputs.source-path }} --output-version
           version: ${{ inputs.dagger_version }}
 
-      - name: Debug Versioner Output
-        run: |
-          echo "Versioner Output: ${{ steps.versioner.outputs.version }}"
-
       - name: Set VERSION Environment Variable
         run: |
           echo "VERSION=${{ steps.versioner.outputs.version }}" >> $GITHUB_ENV
 
-      - name: Debug Version Environment
+      - name: Debug VERSION Value
         run: |
-          echo "Version: $VERSION"
+          echo "VERSION value is: $VERSION"
 
       - name: Run Pipeline
         uses: dagger/dagger-for-github@v7
         env:
-          VERSION: ${{ env.VERSION }}
+          VERSION: ${{ steps.versioner.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
