@@ -15,29 +15,32 @@ type PythonPipeline struct {
 
 // New creates a new instance of PythonPipeline.
 func New(ctx context.Context) (*PythonPipeline, error) {
-	client := dagger.Connect()
+	client, err := dagger.Connect(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Dagger client: %w", err)
+	}
 	return &PythonPipeline{
 		client: client,
 	}, nil
 }
 
-// ContainerConfig holds configuration for the base container
+// ContainerConfig holds configuration for the base container.
 type ContainerConfig struct {
 	pythonVersion string
-	gitEmail     string
-	gitName      string
+	gitEmail      string
+	gitName       string
 }
 
-// DefaultContainerConfig returns default container configuration
+// DefaultContainerConfig returns default container configuration.
 func DefaultContainerConfig() ContainerConfig {
 	return ContainerConfig{
 		pythonVersion: "3.12-slim",
-		gitEmail:     "github-actions[bot]@users.noreply.github.com",
-		gitName:      "github-actions[bot]",
+		gitEmail:      "github-actions[bot]@users.noreply.github.com",
+		gitName:       "github-actions[bot]",
 	}
 }
 
-// setupContainer configures the base container with required dependencies
+// setupContainer configures the base container with required dependencies.
 func (p *PythonPipeline) setupContainer(ctx context.Context, source *dagger.Directory, config ContainerConfig) (*dagger.Container, error) {
 	container := p.client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
@@ -52,7 +55,7 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, source *dagger.Dire
 	return container, nil
 }
 
-// getVersion retrieves the next version using the versioner module
+// getVersion retrieves the next version using the versioner module.
 func (p *PythonPipeline) getVersion(ctx context.Context, source *dagger.Directory) (string, error) {
 	versionerModule := p.client.Versioner()
 	version, err := versionerModule.BumpVersion(ctx, source, true)
@@ -68,13 +71,13 @@ func (p *PythonPipeline) getVersion(ctx context.Context, source *dagger.Director
 	return version, nil
 }
 
-// QualityCheck represents a code quality check to be performed
+// QualityCheck represents a code quality check to be performed.
 type QualityCheck struct {
 	name    string
 	command []string
 }
 
-// DefaultQualityChecks returns the standard set of quality checks
+// DefaultQualityChecks returns the standard set of quality checks.
 func DefaultQualityChecks() []QualityCheck {
 	return []QualityCheck{
 		{"tests", []string{"poetry", "run", "pytest"}},
@@ -83,7 +86,7 @@ func DefaultQualityChecks() []QualityCheck {
 	}
 }
 
-// runQualityChecks executes tests and code quality checks
+// runQualityChecks executes tests and code quality checks.
 func (p *PythonPipeline) runQualityChecks(ctx context.Context, container *dagger.Container, checks []QualityCheck) error {
 	for _, check := range checks {
 		if _, err := container.WithExec(check.command).Stdout(ctx); err != nil {
@@ -93,7 +96,7 @@ func (p *PythonPipeline) runQualityChecks(ctx context.Context, container *dagger
 	return nil
 }
 
-// publishToPyPI handles the PyPI publishing process
+// publishToPyPI handles the PyPI publishing process.
 func (p *PythonPipeline) publishToPyPI(ctx context.Context, container *dagger.Container, token *dagger.Secret) error {
 	tokenValue, err := token.Plaintext(ctx)
 	if err != nil || tokenValue == "" {
@@ -102,7 +105,6 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, container *dagger.Co
 
 	fmt.Printf("Successfully read PYPI_TOKEN: %s\n", tokenValue[:5])
 
-	// Chain all operations together
 	_, err = container.
 		WithSecretVariable("PYPI_TOKEN", token).
 		WithExec([]string{"poetry", "build"}).
@@ -129,7 +131,6 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		return fmt.Errorf("failed to get version: %w", err)
 	}
 
-	// Chain container operations together
 	container = container.
 		WithEnvVariable("VERSION", version).
 		WithExec([]string{"poetry", "install", "--no-interaction"})
