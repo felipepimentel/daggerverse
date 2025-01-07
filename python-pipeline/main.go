@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
@@ -117,26 +116,6 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 
 	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
 
-	// Update version in pyproject.toml before building
-	_, err = container.WithExec([]string{
-		"poetry", "version", version,
-	}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
-	}
-
-	// Verify the version was updated correctly
-	output, err := container.WithExec([]string{
-		"poetry", "version", "--short",
-	}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to verify version: %w", err)
-	}
-	currentVersion := strings.TrimSpace(output)
-	if currentVersion != version {
-		return fmt.Errorf("version mismatch: expected %s, got %s", version, currentVersion)
-	}
-
 	// Clean dist directory before building
 	_, err = container.WithExec([]string{
 		"rm", "-rf", "dist",
@@ -145,7 +124,7 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 		return fmt.Errorf("failed to clean dist directory: %w", err)
 	}
 
-	// Build and publish in sequence to ensure version consistency
+	// Build and publish in sequence
 	commands := []struct {
 		name    string
 		command []string
