@@ -105,10 +105,27 @@ func (p *PythonPipeline) runQualityChecks(ctx context.Context, client *dagger.Cl
 func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Client, container *dagger.Container, token *dagger.Secret) error {
 	fmt.Println("Building and publishing to PyPI...")
 
+	// Get current version from environment
+	version, err := container.EnvVariable(ctx, "VERSION")
+	if err != nil {
+		return fmt.Errorf("failed to get VERSION environment variable: %w", err)
+	}
+	if version == "" {
+		return fmt.Errorf("VERSION environment variable not set")
+	}
+
 	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
 
+	// Update version in pyproject.toml before building
+	_, err = container.WithExec([]string{
+		"poetry", "version", version,
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
+	}
+
 	// Build and publish in a single container execution
-	_, err := container.WithExec([]string{
+	_, err = container.WithExec([]string{
 		"sh", "-c",
 		"poetry config pypi-token.pypi $POETRY_PYPI_TOKEN_PYPI && " +
 		"poetry build && " +
@@ -162,6 +179,8 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	if err != nil {
 		return fmt.Errorf("failed to get version: %w", err)
 	}
+
+	fmt.Printf("Using version: %s\n", version)
 
 	// Set the version in the container environment
 	container = container.WithEnvVariable("VERSION", version)
