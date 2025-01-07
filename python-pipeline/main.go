@@ -39,8 +39,8 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, client *dagger.Clie
 	// Create base container with Python and mount source code
 	container := client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
-		WithDirectory(".", source).
-		WithWorkdir(".")
+		WithDirectory("/src", source).
+		WithWorkdir("/src")
 
 	// Install system dependencies and tools
 	container = container.
@@ -141,13 +141,6 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		return fmt.Errorf("failed to initialize Dagger client")
 	}
 
-	// Debug: Log the source directory structure
-	dirContents, err := client.Container().WithDirectory(".", source).WithExec([]string{"ls", "-la"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list source directory contents: %w", err)
-	}
-	fmt.Printf("Source directory contents:\n%s\n", dirContents)
-
 	// Load default container configuration
 	config := DefaultContainerConfig()
 
@@ -157,6 +150,13 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
 
+	// Debug: Log the source directory structure
+	dirContents, err := container.WithExec([]string{"ls", "-la"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list source directory contents: %w", err)
+	}
+	fmt.Printf("Source directory contents:\n%s\n", dirContents)
+
 	// Get the next version
 	version, err := p.getVersion(ctx, client, source)
 	if err != nil {
@@ -165,12 +165,6 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 	// Set the version in the container environment
 	container = container.WithEnvVariable("VERSION", version)
-
-	// Install dependencies
-	_, err = container.WithExec([]string{"poetry", "install", "--no-interaction"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to install dependencies: %w", err)
-	}
 
 	// Run quality checks
 	err = p.runQualityChecks(ctx, client, container)
