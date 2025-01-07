@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/felipepimentel/daggerverse/python-pipeline/internal/dagger"
 )
@@ -124,19 +125,46 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 		return fmt.Errorf("failed to update version in pyproject.toml: %w", err)
 	}
 
-	// Build and publish in a single container execution
-	_, err = container.WithExec([]string{
-		"sh", "-c",
-		"poetry config pypi-token.pypi $POETRY_PYPI_TOKEN_PYPI && " +
-		"poetry build && " +
-		"ls -la dist && " +
-		"poetry publish --username __token__ --no-interaction",
+	// Verify the version was updated correctly
+	output, err := container.WithExec([]string{
+		"poetry", "version", "--short",
 	}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to build and publish package: %w", err)
+		return fmt.Errorf("failed to verify version: %w", err)
+	}
+	currentVersion := strings.TrimSpace(output)
+	if currentVersion != version {
+		return fmt.Errorf("version mismatch: expected %s, got %s", version, currentVersion)
 	}
 
-	fmt.Println("Package built and published successfully to PyPI!")
+	// Clean dist directory before building
+	_, err = container.WithExec([]string{
+		"rm", "-rf", "dist",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to clean dist directory: %w", err)
+	}
+
+	// Build and publish in sequence to ensure version consistency
+	commands := []struct {
+		name    string
+		command []string
+	}{
+		{"configure token", []string{"poetry", "config", "pypi-token.pypi", "$POETRY_PYPI_TOKEN_PYPI"}},
+		{"build package", []string{"poetry", "build"}},
+		{"verify dist", []string{"ls", "-la", "dist"}},
+		{"publish package", []string{"poetry", "publish", "--username", "__token__", "--no-interaction"}},
+	}
+
+	for _, cmd := range commands {
+		fmt.Printf("Executing: %s\n", cmd.name)
+		_, err = container.WithExec(cmd.command).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to %s: %w", cmd.name, err)
+		}
+	}
+
+	fmt.Printf("Package version %s built and published successfully to PyPI!\n", version)
 	return nil
 }
 
