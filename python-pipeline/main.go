@@ -150,12 +150,20 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
 
-	// Debug: Log the source directory structure
-	dirContents, err := container.WithExec([]string{"ls", "-la"}).Stdout(ctx)
+	// Debug: Log both root and source directory structures
+	fmt.Println("Root directory contents:")
+	rootContents, err := container.WithExec([]string{"ls", "-la", "/"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list root directory contents: %w", err)
+	}
+	fmt.Printf("%s\n", rootContents)
+
+	fmt.Println("\nSource directory contents (/src):")
+	srcContents, err := container.WithExec([]string{"ls", "-la", "/src"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list source directory contents: %w", err)
 	}
-	fmt.Printf("Source directory contents:\n%s\n", dirContents)
+	fmt.Printf("%s\n", srcContents)
 
 	// Get the next version
 	version, err := p.getVersion(ctx, client, source)
