@@ -14,11 +14,14 @@ type PythonPipeline struct {
 }
 
 // New creates a new instance of PythonPipeline.
-func New(ctx context.Context) *PythonPipeline {
+func New(ctx context.Context) (*PythonPipeline, error) {
 	client := dagger.Connect()
+	if client == nil {
+		return nil, fmt.Errorf("failed to initialize Dagger client")
+	}
 	return &PythonPipeline{
 		client: client,
-	}
+	}, nil
 }
 
 // ContainerConfig holds configuration for the base container.
@@ -39,6 +42,10 @@ func DefaultContainerConfig() ContainerConfig {
 
 // setupContainer configures the base container with required dependencies.
 func (p *PythonPipeline) setupContainer(ctx context.Context, source *dagger.Directory, config ContainerConfig) (*dagger.Container, error) {
+	if p.client == nil {
+		return nil, fmt.Errorf("Dagger client is not initialized")
+	}
+
 	container := p.client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
 		WithDirectory("/src", source).
@@ -118,6 +125,7 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, container *dagger.Co
 // CICD runs the complete CI/CD pipeline for a Python project.
 func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	config := DefaultContainerConfig()
+
 	container, err := p.setupContainer(ctx, source, config)
 	if err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
