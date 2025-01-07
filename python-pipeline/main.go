@@ -97,14 +97,16 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 
 	container = container.WithSecretVariable("PYPI_TOKEN", token)
 
-	_, err := container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
+	// Check dist directory content
+	_, err := container.WithExec([]string{"ls", "-la", "/src/dist"}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to build the package: %w", err)
+		return fmt.Errorf("failed to list dist directory contents: %w", err)
 	}
 
-	_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
+	// Combine build and publish
+	_, err = container.WithExec([]string{"poetry", "publish", "--build", "--no-interaction"}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to publish to PyPI: %w", err)
+		return fmt.Errorf("failed to build and publish to PyPI: %w", err)
 	}
 
 	fmt.Println("Package published successfully to PyPI!")
