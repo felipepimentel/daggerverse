@@ -14,14 +14,11 @@ type PythonPipeline struct {
 }
 
 // New creates a new instance of PythonPipeline.
-func New(ctx context.Context) (*PythonPipeline, error) {
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Dagger client: %w", err)
-	}
+func New(ctx context.Context) *PythonPipeline {
+	client := dagger.Connect()
 	return &PythonPipeline{
 		client: client,
-	}, nil
+	}
 }
 
 // ContainerConfig holds configuration for the base container.
