@@ -110,7 +110,10 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 	// Build and publish in a single container execution
 	_, err := container.WithExec([]string{
 		"sh", "-c",
-		"poetry build && ls -la dist && poetry publish --no-interaction",
+		"poetry config repositories.pypi https://upload.pypi.org/legacy/ && " +
+		"poetry build && " +
+		"ls -la dist && " +
+		"poetry publish --no-interaction",
 	}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to build and publish package: %w", err)
