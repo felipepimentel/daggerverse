@@ -38,8 +38,8 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, client *dagger.Clie
 
 	container := client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
+		WithDirectory("/project", source).
+		WithWorkdir("/project").
 		WithExec([]string{"apt-get", "update"}).
 		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "ca-certificates"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
@@ -104,7 +104,7 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 	}
 
 	// Check dist directory content
-	output, err := container.WithExec([]string{"ls", "-la", "/src/dist"}).Stdout(ctx)
+	output, err := container.WithExec([]string{"ls", "-la", "/project/dist"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list dist directory contents: %w", err)
 	}
@@ -130,6 +130,13 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	if client == nil {
 		return fmt.Errorf("failed to initialize Dagger client")
 	}
+
+	// Debug: Log the source directory structure
+	dirContents, err := client.Container().WithDirectory("/project", source).WithExec([]string{"ls", "-la", "/project"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list source directory contents: %w", err)
+	}
+	fmt.Printf("Source directory contents:\n%s\n", dirContents)
 
 	// Load default container configuration
 	config := DefaultContainerConfig()
