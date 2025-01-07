@@ -94,6 +94,9 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 		fmt.Printf("Build output: %s\n", buildResult)
 
+		// Ensure the correct working directory before publishing
+		container = container.WithWorkdir("/src")
+
 		// Publish the package to PyPI
 		publishResult, err := container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
 		if err != nil {
