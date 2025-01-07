@@ -44,7 +44,8 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, client *dagger.Clie
 		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "ca-certificates"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
 		WithExec([]string{"git", "config", "--global", "user.email", config.gitEmail}).
-		WithExec([]string{"git", "config", "--global", "user.name", config.gitName})
+		WithExec([]string{"git", "config", "--global", "user.name", config.gitName}).
+		WithExec([]string{"poetry", "install", "--with", "dev", "--no-interaction"})
 
 	fmt.Println("Container setup completed!")
 	return container, nil
