@@ -103,31 +103,20 @@ func (p *PythonPipeline) runQualityChecks(ctx context.Context, client *dagger.Cl
 
 // publishToPyPI publishes the package to PyPI if a token is provided.
 func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Client, container *dagger.Container, token *dagger.Secret) error {
-	fmt.Println("Publishing to PyPI...")
+	fmt.Println("Building and publishing to PyPI...")
 
 	container = container.WithSecretVariable("PYPI_TOKEN", token)
 
-	// Build the package
-	_, err := container.WithExec([]string{"poetry", "build"}).Stdout(ctx)
+	// Build and publish in a single container execution
+	_, err := container.WithExec([]string{
+		"sh", "-c",
+		"poetry build && ls -la dist && poetry publish --no-interaction",
+	}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to build the package: %w", err)
+		return fmt.Errorf("failed to build and publish package: %w", err)
 	}
 
-	// Check dist directory content
-	output, err := container.WithExec([]string{"ls", "-la", "dist"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list dist directory contents: %w", err)
-	}
-
-	fmt.Printf("Dist directory contents:\n%s\n", output)
-
-	// Publish the package
-	_, err = container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to publish to PyPI: %w", err)
-	}
-
-	fmt.Println("Package published successfully to PyPI!")
+	fmt.Println("Package built and published successfully to PyPI!")
 	return nil
 }
 
