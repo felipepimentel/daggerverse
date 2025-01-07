@@ -15,12 +15,15 @@ type PythonPipeline struct {
 
 // New creates a new instance of PythonPipeline.
 func New(ctx context.Context) (*PythonPipeline, error) {
+	fmt.Println("Initializing Dagger client...")
+
 	// Initialize the Dagger client
 	client := dagger.Connect()
 	if client == nil {
 		return nil, fmt.Errorf("failed to initialize Dagger client")
 	}
 
+	fmt.Println("Dagger client initialized successfully!")
 	return &PythonPipeline{
 		client: client,
 	}, nil
@@ -49,6 +52,8 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, source *dagger.Dire
 		return nil, fmt.Errorf("Dagger client is not initialized")
 	}
 
+	fmt.Println("Setting up container...")
+
 	container := p.client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
 		WithDirectory("/src", source).
@@ -59,6 +64,7 @@ func (p *PythonPipeline) setupContainer(ctx context.Context, source *dagger.Dire
 		WithExec([]string{"git", "config", "--global", "user.email", config.gitEmail}).
 		WithExec([]string{"git", "config", "--global", "user.name", config.gitName})
 
+	fmt.Println("Container setup completed!")
 	return container, nil
 }
 
@@ -68,6 +74,8 @@ func (p *PythonPipeline) getVersion(ctx context.Context, source *dagger.Director
 	if p.client == nil {
 		return "", fmt.Errorf("Dagger client is not initialized")
 	}
+
+	fmt.Println("Getting version from versioner module...")
 
 	versionerModule := p.client.Versioner()
 	version, err := versionerModule.BumpVersion(ctx, source, true)
@@ -136,6 +144,8 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, container *dagger.Co
 
 // CICD runs the complete CI/CD pipeline for a Python project.
 func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+	fmt.Println("Starting CI/CD pipeline...")
+
 	// Load default container configuration
 	config := DefaultContainerConfig()
 
@@ -144,8 +154,6 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	if err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
-
-	fmt.Println("Container successfully setup!")
 
 	// Get the next version
 	version, err := p.getVersion(ctx, source)
