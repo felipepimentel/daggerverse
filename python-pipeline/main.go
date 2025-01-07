@@ -36,15 +36,25 @@ func DefaultContainerConfig() ContainerConfig {
 func (p *PythonPipeline) setupContainer(ctx context.Context, client *dagger.Client, source *dagger.Directory, config ContainerConfig) (*dagger.Container, error) {
 	fmt.Println("Setting up container...")
 
+	// Create base container with Python and mount source code
 	container := client.Container().
 		From(fmt.Sprintf("python:%s", config.pythonVersion)).
-		WithDirectory("/project", source).
-		WithWorkdir("/project").
+		WithDirectory(".", source).
+		WithWorkdir(".")
+
+	// Install system dependencies and tools
+	container = container.
 		WithExec([]string{"apt-get", "update"}).
 		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "ca-certificates"}).
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
+
+	// Configure git
+	container = container.
 		WithExec([]string{"git", "config", "--global", "user.email", config.gitEmail}).
-		WithExec([]string{"git", "config", "--global", "user.name", config.gitName}).
+		WithExec([]string{"git", "config", "--global", "user.name", config.gitName})
+
+	// Install poetry dependencies from the source project
+	container = container.
 		WithExec([]string{"poetry", "install", "--with", "dev", "--no-interaction"})
 
 	fmt.Println("Container setup completed!")
@@ -104,7 +114,7 @@ func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Clien
 	}
 
 	// Check dist directory content
-	output, err := container.WithExec([]string{"ls", "-la", "/project/dist"}).Stdout(ctx)
+	output, err := container.WithExec([]string{"ls", "-la", "dist"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list dist directory contents: %w", err)
 	}
@@ -132,7 +142,7 @@ func (p *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 	}
 
 	// Debug: Log the source directory structure
-	dirContents, err := client.Container().WithDirectory("/project", source).WithExec([]string{"ls", "-la", "/project"}).Stdout(ctx)
+	dirContents, err := client.Container().WithDirectory(".", source).WithExec([]string{"ls", "-la"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list source directory contents: %w", err)
 	}
