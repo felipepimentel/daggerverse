@@ -27,6 +27,11 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "ca-certificates"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"})
 
+	// Sync after initial container setup
+	if _, err := container.Sync(ctx); err != nil {
+		return fmt.Errorf("failed to sync container after initial setup: %w", err)
+	}
+
 	// Configure git
 	container = container.
 		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
@@ -50,6 +55,11 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 	// Install dependencies
 	container = container.WithExec([]string{"poetry", "install", "--no-interaction"})
+
+	// Sync after installing dependencies
+	if _, err := container.Sync(ctx); err != nil {
+		return fmt.Errorf("failed to sync container after dependencies installation: %w", err)
+	}
 
 	// Run tests
 	_, err = container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx)
@@ -94,8 +104,10 @@ func (m *PythonPipeline) CICD(ctx context.Context, source *dagger.Directory, tok
 
 		fmt.Printf("Build output: %s\n", buildResult)
 
-		// Ensure the correct working directory before publishing
-		container = container.WithWorkdir("/src")
+		// Sync after building the package
+		if _, err := container.Sync(ctx); err != nil {
+			return fmt.Errorf("failed to sync container after building the package: %w", err)
+		}
 
 		// Publish the package to PyPI
 		publishResult, err := container.WithExec([]string{"poetry", "publish", "--no-interaction"}).Stdout(ctx)
