@@ -105,15 +105,15 @@ func (p *PythonPipeline) runQualityChecks(ctx context.Context, client *dagger.Cl
 func (p *PythonPipeline) publishToPyPI(ctx context.Context, client *dagger.Client, container *dagger.Container, token *dagger.Secret) error {
 	fmt.Println("Building and publishing to PyPI...")
 
-	container = container.WithSecretVariable("PYPI_TOKEN", token)
+	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
 
 	// Build and publish in a single container execution
 	_, err := container.WithExec([]string{
 		"sh", "-c",
-		"poetry config repositories.pypi https://upload.pypi.org/legacy/ && " +
+		"poetry config pypi-token.pypi $POETRY_PYPI_TOKEN_PYPI && " +
 		"poetry build && " +
 		"ls -la dist && " +
-		"poetry publish --no-interaction",
+		"poetry publish --username __token__ --no-interaction",
 	}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to build and publish package: %w", err)
