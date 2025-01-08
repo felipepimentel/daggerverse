@@ -1,5 +1,5 @@
 {
-  "name": "python-pypi",
+  "name": "poetry",
   "engineVersion": "v0.15.1",
   "sdk": "go",
   "source": "."

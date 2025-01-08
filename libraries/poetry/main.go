@@ -5,27 +5,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/felipepimentel/daggerverse/python-poetry/internal/dagger"
+	"github.com/felipepimentel/daggerverse/poetry/internal/dagger"
 )
 
-// PythonPoetry handles Python project management with Poetry.
-type PythonPoetry struct {
+// Poetry handles Python project management with Poetry.
+type Poetry struct {
 	// Add base container configuration
 	baseImage string
 	client    *dagger.Client
 }
 
-// New creates a new instance of PythonPoetry.
-func New(ctx context.Context) (*PythonPoetry, error) {
+// New creates a new instance of Poetry.
+func New(ctx context.Context) (*Poetry, error) {
 	client := dagger.Connect()
-	return &PythonPoetry{
+	return &Poetry{
 		baseImage: "python:3.12-alpine",
 		client:    client,
 	}, nil
 }
 
 // getBaseContainer returns a configured base container with Poetry installed
-func (m *PythonPoetry) getBaseContainer(source *dagger.Directory) *dagger.Container {
+func (m *Poetry) getBaseContainer(source *dagger.Directory) *dagger.Container {
 	return m.client.Container().
 		From(m.baseImage).
 		WithDirectory("/src", source).
@@ -40,7 +40,7 @@ func (m *PythonPoetry) getBaseContainer(source *dagger.Directory) *dagger.Contai
 // Returns:
 // - *dagger.Directory: The directory with installed dependencies
 // - error: Any error that occurred during installation
-func (m *PythonPoetry) Install(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (m *Poetry) Install(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
 		WithExec([]string{"poetry", "install", "--no-interaction"})
@@ -55,7 +55,7 @@ func (m *PythonPoetry) Install(ctx context.Context, source *dagger.Directory) (*
 // Returns:
 // - *dagger.Directory: The directory containing the built package
 // - error: Any error that occurred during build
-func (m *PythonPoetry) Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (m *Poetry) Build(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "build"})
 
@@ -69,7 +69,7 @@ func (m *PythonPoetry) Build(ctx context.Context, source *dagger.Directory) (*da
 // Returns:
 // - string: The test output
 // - error: Any error that occurred during testing
-func (m *PythonPoetry) Test(ctx context.Context, source *dagger.Directory) (string, error) {
+func (m *Poetry) Test(ctx context.Context, source *dagger.Directory) (string, error) {
 	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
 		WithExec([]string{"poetry", "install", "--no-interaction"})
@@ -89,7 +89,7 @@ func (m *PythonPoetry) Test(ctx context.Context, source *dagger.Directory) (stri
 // Returns:
 // - *dagger.Directory: The directory containing the updated lock file
 // - error: Any error that occurred during lock update
-func (m *PythonPoetry) Lock(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (m *Poetry) Lock(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "lock", "--no-update"})
 
@@ -103,7 +103,7 @@ func (m *PythonPoetry) Lock(ctx context.Context, source *dagger.Directory) (*dag
 // Returns:
 // - *dagger.Directory: The directory with updated dependencies
 // - error: Any error that occurred during update
-func (m *PythonPoetry) Update(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (m *Poetry) Update(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	container := m.getBaseContainer(source).
 		WithExec([]string{"poetry", "update"})
 

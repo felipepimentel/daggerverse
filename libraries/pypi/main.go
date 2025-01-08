@@ -6,15 +6,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/felipepimentel/daggerverse/python-pypi/internal/dagger"
+	"github.com/felipepimentel/daggerverse/pypi/internal/dagger"
 )
 
-// PythonPublisher handles publishing Python packages to PyPI.
-type PythonPublisher struct{}
+// Pypi handles publishing Python packages to PyPI.
+type Pypi struct{}
 
-// New creates a new instance of PythonPublisher.
-func New(ctx context.Context) (*PythonPublisher, error) {
-	return &PythonPublisher{}, nil
+// New creates a new instance of Pypi.
+func New(ctx context.Context) (*Pypi, error) {
+	return &Pypi{}, nil
 }
 
 // Publish publishes a Python package to PyPI using Poetry.
@@ -30,7 +30,7 @@ func New(ctx context.Context) (*PythonPublisher, error) {
 //
 // Returns:
 // - error: Any error that occurred during the publishing process
-func (m *PythonPublisher) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+func (m *Pypi) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	client := dagger.Connect()
 
 	// Setup Python container with Poetry
