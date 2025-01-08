@@ -124,7 +124,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 
 	fmt.Println(logStartPyPI)
 	// Publish to PyPI using the pypi module
-	if err := dag.Pypi().Publish(ctx, buildDir, token); err != nil {
+	if err := dag.Pypi().Publish(ctx, buildDir.Directory("dist"), token); err != nil {
 		return "", fmt.Errorf("%s: %w", errPypiPublish, err)
 	}
 	fmt.Println(logSuccessPyPI)
