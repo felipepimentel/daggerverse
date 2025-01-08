@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/pypi
+module github.com/felipepimentel/daggerverse/libraries/pypi
 
 go 1.22.7
 

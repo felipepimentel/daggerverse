@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/felipepimentel/daggerverse/pypi/internal/dagger"
+	"github.com/felipepimentel/daggerverse/libraries/pypi/internal/dagger"
 )
 
 // Pypi handles publishing Python packages to PyPI.

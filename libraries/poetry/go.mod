@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/poetry
+module github.com/felipepimentel/daggerverse/libraries/poetry
 
 go 1.22.7
 
