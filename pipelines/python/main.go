@@ -16,7 +16,8 @@ const (
 	errPublish        = "failed to publish container"
 	errPoetryTest     = "poetry test failed"
 	errRuffCheck      = "ruff check failed"
-	errPypiPublish    = "failed to publish to PyPI"
+	errPypiPublish    = "failed to publish package to PyPI"
+	errBuild          = "failed to build package"
 )
 
 // Log messages for progress tracking.
@@ -24,12 +25,12 @@ const (
 	logStartPublish    = "Starting publish process..."
 	logStartTests      = "Running tests..."
 	logStartLint       = "Running linting checks..."
-	logStartBuild      = "Building package..."
-	logStartPyPI       = "Publishing to PyPI..."
+	logStartBuild      = "🏗️  Building package..."
+	logStartPyPI       = "📦 Publishing to PyPI..."
 	logStartContainer  = "Publishing container..."
 	logSuccessTests    = "All tests passed successfully!"
 	logSuccessLint     = "All linting checks passed!"
-	logSuccessPyPI     = "Package published successfully to PyPI"
+	logSuccessPyPI     = "✅ Package published to PyPI successfully!"
 	logSuccessVersion  = "Using version: %s"
 	logSuccessPublish  = "Container published successfully to: %s"
 )
@@ -129,20 +130,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	}
 	fmt.Println(logSuccessPyPI)
 
-	fmt.Println(logStartContainer)
-	// Publish container
-	address, err := dag.Container().
-		From(fmt.Sprintf("python:%s", p.pythonVersion)).
-		WithDirectory(containerWorkdir, buildDir).
-		WithWorkdir(containerWorkdir).
-		Publish(ctx, fmt.Sprintf(registryURLFmt, version))
-
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", errPublish, err)
-	}
-
-	fmt.Printf(logSuccessPublish+"\n", address)
-	return address, nil
+	return version, nil
 }
 
 // Build creates a container with all dependencies installed and configured.
