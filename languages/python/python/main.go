@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/felipepimentel/daggerverse/python/internal/dagger"
@@ -91,25 +90,15 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 
 	fmt.Println("Using version:", version)
 
-	// Build container with all dependencies
-	baseContainer := m.Build(ctx, source)
-	if baseContainer == nil {
-		return "", errors.New(errBuildContainer)
-	}
-
-	// Use Poetry module for dependency management
-	poetryContainer := dag.Container().From(fmt.Sprintf("python:%s", m.pythonVersion))
-	poetryContainer = poetryContainer.
-		WithDirectory(containerWorkdir, source).
-		WithWorkdir(containerWorkdir).
-		WithExec([]string{"pip", "install", "poetry"}).
-		WithExec([]string{"poetry", "install", "--with", "dev"})
+	// Build package using Poetry module
+	buildDir := dag.Poetry().Build(source)
 
 	// Use PyPI module for publishing
-	pypiContainer := poetryContainer.
+	pypiContainer := dag.Container().From(fmt.Sprintf("python:%s", m.pythonVersion)).
+		WithDirectory(containerWorkdir, buildDir).
+		WithWorkdir(containerWorkdir).
 		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token).
 		WithEnvVariable("VERSION", version).
-		WithExec([]string{"poetry", "build"}).
 		WithExec([]string{"poetry", "publish", "--username", "__token__", "--no-interaction"})
 
 	// Run Ruff checks using the ruff module
@@ -135,25 +124,22 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 // Build creates a container with all dependencies installed and configured.
 // It returns the configured container or nil if the build fails.
 func (m *Python) Build(ctx context.Context, source *dagger.Directory) *dagger.Container {
+	// Install dependencies using Poetry module
+	installedDir := dag.Poetry().Install(source)
+
 	return dag.Container().
 		From(fmt.Sprintf("python:%s", m.pythonVersion)).
-		WithDirectory(containerWorkdir, source).
-		WithWorkdir(containerWorkdir).
-		WithExec([]string{"pip", "install", "poetry"}).
-		WithExec([]string{"poetry", "install", "--with", "dev"})
+		WithDirectory(containerWorkdir, installedDir).
+		WithWorkdir(containerWorkdir)
 }
 
 // Test runs all quality checks and returns the combined test output.
 // It returns an error if any check fails.
 func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, error) {
-	container := m.Build(ctx, source)
-	if container == nil {
-		return "", errors.New(errBuildTestEnv)
-	}
-
-	// Run tests with Poetry
-	if _, err := container.WithExec([]string{"poetry", "run", "pytest"}).Stdout(ctx); err != nil {
-		return "", fmt.Errorf("pytest failed: %w", err)
+	// Run tests using Poetry module
+	testOutput, err := dag.Poetry().Test(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("poetry test failed: %w", err)
 	}
 
 	// Run Ruff checks using the ruff module
@@ -163,7 +149,7 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 		return "", fmt.Errorf("ruff check failed: %w", err)
 	}
 
-	return "All tests and checks passed successfully!", nil
+	return fmt.Sprintf("Test output:\n%s\nAll tests and checks passed successfully!", testOutput), nil
 }
 
 // BuildEnv creates a development environment with all dependencies installed.
