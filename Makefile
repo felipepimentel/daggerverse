@@ -1,6 +1,11 @@
 # Automatically detected modules with go.mod (including nested modules)
 MODULES := $(shell find . -name go.mod -not -path "*/\.*" -exec dirname {} \; | grep -v '^\.$$' | sed 's|^\./||' | sort)
 
+# Module categories
+ESSENTIAL_MODULES := $(shell find essentials -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
+LANGUAGE_MODULES := $(shell find languages -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
+PIPELINE_MODULES := $(shell find pipelines -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
+
 # Colors for pretty output
 GREEN  := \033[32m
 YELLOW := \033[33m
@@ -35,8 +40,13 @@ check-module:
 	fi
 	@if [ -n "$(MODULE)" ] && ! echo "$(MODULES)" | tr ' ' '\n' | grep -q "^$(MODULE)$$"; then \
 		echo "${YELLOW}Error:${RESET} Invalid module: $(MODULE)"; \
-		echo "Available modules:"; \
-		echo "$(MODULES)" | tr ' ' '\n' | sed 's/^/  - /'; \
+		echo "Available modules by category:"; \
+		echo "${GREEN}Essential modules:${RESET}"; \
+		echo "$(ESSENTIAL_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'; \
+		echo "${GREEN}Language modules:${RESET}"; \
+		echo "$(LANGUAGE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'; \
+		echo "${GREEN}Pipeline modules:${RESET}"; \
+		echo "$(PIPELINE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'; \
 		exit 1; \
 	fi
 
@@ -46,8 +56,13 @@ help: ## Show this help
 	@echo 'Usage:'
 	@echo '  make <target> [MODULE=<module>]'
 	@echo ''
-	@echo 'Available modules:'
-	@echo "$(MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
+	@echo 'Available modules by category:'
+	@echo "${GREEN}Essential modules:${RESET}"
+	@echo "$(ESSENTIAL_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
+	@echo "${GREEN}Language modules:${RESET}"
+	@echo "$(LANGUAGE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
+	@echo "${GREEN}Pipeline modules:${RESET}"
+	@echo "$(PIPELINE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
 	@echo ''
 	@echo 'Targets:'
 	@awk 'BEGIN {FS = ":.*?## "}; /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
@@ -176,3 +191,39 @@ check: fmt vet lint test ## Run all checks (format, vet, lint, test) (MODULE=<mo
 clean-temp: ## Clean temporary files
 	@echo "${GREEN}Cleaning temporary files...${RESET}"
 	@find . -name '*.tmp' -delete
+
+.PHONY: essential
+essential: check-deps ## Run operation on essential modules only (make essential <operation>)
+	@if [ -z "$(OPERATION)" ]; then \
+		echo "${YELLOW}Error:${RESET} OPERATION is required. Example: make essential OPERATION=test"; \
+		exit 1; \
+	fi
+	@echo "${GREEN}Running $(OPERATION) on essential modules...${RESET}"; \
+	for module in $(ESSENTIAL_MODULES); do \
+		$(call print_separator,"$$module - $(OPERATION)"); \
+		(cd $$module && make $(OPERATION)) || exit 1; \
+	done
+
+.PHONY: languages
+languages: check-deps ## Run operation on language modules only (make languages <operation>)
+	@if [ -z "$(OPERATION)" ]; then \
+		echo "${YELLOW}Error:${RESET} OPERATION is required. Example: make languages OPERATION=test"; \
+		exit 1; \
+	fi
+	@echo "${GREEN}Running $(OPERATION) on language modules...${RESET}"; \
+	for module in $(LANGUAGE_MODULES); do \
+		$(call print_separator,"$$module - $(OPERATION)"); \
+		(cd $$module && make $(OPERATION)) || exit 1; \
+	done
+
+.PHONY: pipelines
+pipelines: check-deps ## Run operation on pipeline modules only (make pipelines <operation>)
+	@if [ -z "$(OPERATION)" ]; then \
+		echo "${YELLOW}Error:${RESET} OPERATION is required. Example: make pipelines OPERATION=test"; \
+		exit 1; \
+	fi
+	@echo "${GREEN}Running $(OPERATION) on pipeline modules...${RESET}"; \
+	for module in $(PIPELINE_MODULES); do \
+		$(call print_separator,"$$module - $(OPERATION)"); \
+		(cd $$module && make $(OPERATION)) || exit 1; \
+	done
