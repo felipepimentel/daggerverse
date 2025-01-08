@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/python
+module github.com/felipepimentel/daggerverse/pipelines/python
 
 go 1.22.7
 

@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/felipepimentel/daggerverse/python/internal/dagger"
+	"github.com/felipepimentel/daggerverse/pipelines/python/internal/dagger"
 )
 
 // Error messages for common failures.
