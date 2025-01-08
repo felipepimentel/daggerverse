@@ -34,9 +34,12 @@ func New(
 // Publish publishes a Python package to PyPI.
 // It expects the source directory to contain the built package (dist directory).
 func (m *Pypi) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
+	// Get the parent directory that contains pyproject.toml
+	parentDir := source.Directory("..")
+
 	container := dag.Container().
 		From(m.BaseImage).
-		WithDirectory("/src", source).
+		WithDirectory("/src", parentDir).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
 		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token).
