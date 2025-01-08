@@ -1,11 +1,22 @@
-# Automatically detected modules with go.mod
-MODULES := $(shell find . -maxdepth 2 -name go.mod -exec dirname {} \; | grep -v '^\.$$' | sed 's|^\./||')
+# Automatically detected modules with go.mod (including nested modules)
+MODULES := $(shell find . -name go.mod -not -path "*/\.*" -exec dirname {} \; | grep -v '^\.$$' | sed 's|^\./||' | sort)
 
 # Colors for pretty output
 GREEN  := \033[32m
 YELLOW := \033[33m
 WHITE  := \033[37m
 RESET  := \033[0m
+
+# Separator for visual clarity
+define print_separator
+	@echo "${WHITE}"; \
+	printf '=%.0s' {1..80}; \
+	echo "${RESET}"; \
+	echo "${GREEN}$$1${RESET}"; \
+	echo "${WHITE}"; \
+	printf '=%.0s' {1..80}; \
+	echo "${RESET}"
+endef
 
 # Default target
 .DEFAULT_GOAL := help
@@ -22,8 +33,10 @@ check-module:
 		echo "${YELLOW}Error:${RESET} MODULE is required. Use MODULE=<module>"; \
 		exit 1; \
 	fi
-	@if [ -n "$(MODULE)" ] && ! echo "$(MODULES)" | grep -q "\b$(MODULE)\b"; then \
-		echo "${YELLOW}Error:${RESET} Invalid module: $(MODULE). Available modules: $(MODULES)"; \
+	@if [ -n "$(MODULE)" ] && ! echo "$(MODULES)" | tr ' ' '\n' | grep -q "^$(MODULE)$$"; then \
+		echo "${YELLOW}Error:${RESET} Invalid module: $(MODULE)"; \
+		echo "Available modules:"; \
+		echo "$(MODULES)" | tr ' ' '\n' | sed 's/^/  - /'; \
 		exit 1; \
 	fi
 
@@ -33,7 +46,8 @@ help: ## Show this help
 	@echo 'Usage:'
 	@echo '  make <target> [MODULE=<module>]'
 	@echo ''
-	@echo 'Available modules: $(MODULES)'
+	@echo 'Available modules:'
+	@echo "$(MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
 	@echo ''
 	@echo 'Targets:'
 	@awk 'BEGIN {FS = ":.*?## "}; /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
@@ -46,7 +60,7 @@ clean: check-deps ## Clean generated files and dependencies (MODULE=<module> for
 	else \
 		echo "${GREEN}Cleaning all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Cleaning $$module...${RESET}"; \
+			$(call print_separator,"Cleaning $$module"); \
 			(cd $$module && rm -rf internal dagger.gen.go go.sum 2>/dev/null || true); \
 		done; \
 	fi
@@ -59,7 +73,7 @@ tidy: check-deps ## Run go mod tidy (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Running go mod tidy on all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Tidying $$module...${RESET}"; \
+			$(call print_separator,"Tidying $$module"); \
 			(cd $$module && go mod tidy) || exit 1; \
 		done; \
 	fi
@@ -72,7 +86,7 @@ develop: check-deps ## Run dagger develop (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Running dagger develop on all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Developing $$module...${RESET}"; \
+			$(call print_separator,"Developing $$module"); \
 			(cd $$module && dagger develop); \
 		done; \
 	fi
@@ -84,7 +98,10 @@ test: check-deps ## Run tests (MODULE=<module> for specific module)
 		(cd $(MODULE) && go test ./...); \
 	else \
 		echo "${GREEN}Running tests on all modules in parallel...${RESET}"; \
-		echo $(MODULES) | xargs -n 1 -P 4 -I {} bash -c 'echo "Testing {}"; cd {} && go test ./...'; \
+		for module in $(MODULES); do \
+			$(call print_separator,"Testing $$module"); \
+			(cd $$module && go test ./...) || exit 1; \
+		done; \
 	fi
 
 .PHONY: fmt
@@ -95,7 +112,7 @@ fmt: check-deps ## Format Go files (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Formatting Go files in all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Formatting $$module...${RESET}"; \
+			$(call print_separator,"Formatting $$module"); \
 			(cd $$module && go fmt ./...); \
 		done; \
 	fi
@@ -108,7 +125,7 @@ vet: check-deps ## Run go vet (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Running go vet on all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Vetting $$module...${RESET}"; \
+			$(call print_separator,"Vetting $$module"); \
 			(cd $$module && go vet ./...); \
 		done; \
 	fi
@@ -121,7 +138,7 @@ lint: check-deps ## Run linters (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Running linters on all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Linting $$module...${RESET}"; \
+			$(call print_separator,"Linting $$module"); \
 			(cd $$module && golangci-lint run ./...); \
 		done; \
 	fi
@@ -134,7 +151,7 @@ build: check-deps ## Build modules (MODULE=<module> for specific module)
 	else \
 		echo "${GREEN}Building all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Building $$module...${RESET}"; \
+			$(call print_separator,"Building $$module"); \
 			(cd $$module && go build ./...); \
 		done; \
 	fi
@@ -147,7 +164,7 @@ update-deps: check-deps ## Update dependencies (MODULE=<module> for specific mod
 	else \
 		echo "${GREEN}Updating dependencies for all modules...${RESET}"; \
 		for module in $(MODULES); do \
-			echo "${YELLOW}Updating dependencies for $$module...${RESET}"; \
+			$(call print_separator,"Updating dependencies for $$module"); \
 			(cd $$module && go get -u ./... && go mod tidy); \
 		done; \
 	fi

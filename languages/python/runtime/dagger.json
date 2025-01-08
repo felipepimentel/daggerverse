@@ -1,0 +1,28 @@
+{
+  "name": "python-runtime",
+  "engineVersion": "v0.15.1",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "git",
+      "source": "../../../essentials/git"
+    },
+    {
+      "name": "poetry",
+      "source": "../poetry"
+    },
+    {
+      "name": "pypi",
+      "source": "../pypi"
+    },
+    {
+      "name": "ruff",
+      "source": "../../../essentials/ruff"
+    },
+    {
+      "name": "versioner",
+      "source": "../../../essentials/versioner"
+    }
+  ],
+  "source": "."
+}
