@@ -94,25 +94,15 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	buildDir := dag.Poetry().Build(source)
 
 	// Use PyPI module for publishing
-	pypiContainer := dag.Container().From(fmt.Sprintf("python:%s", m.pythonVersion)).
+	address, err := dag.Container().
+		From(fmt.Sprintf("python:%s", m.pythonVersion)).
 		WithDirectory(containerWorkdir, buildDir).
 		WithWorkdir(containerWorkdir).
 		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token).
 		WithEnvVariable("VERSION", version).
-		WithExec([]string{"poetry", "publish", "--username", "__token__", "--no-interaction"})
+		WithExec([]string{"poetry", "publish", "--username", "__token__", "--no-interaction"}).
+		Publish(ctx, fmt.Sprintf(registryURLFmt, version))
 
-	// Run Ruff checks using the ruff module
-	ruffModule := dag.Ruff()
-	lintRun := ruffModule.Lint(source)
-	if err := lintRun.Assert(ctx); err != nil {
-		return "", fmt.Errorf("ruff check failed: %w", err)
-	}
-
-	fmt.Println("Package version", version, "published successfully to PyPI")
-
-	// Publish container
-	fmt.Println("Publishing container...")
-	address, err := pypiContainer.Publish(ctx, fmt.Sprintf(registryURLFmt, version))
 	if err != nil {
 		return "", fmt.Errorf("failed to publish container: %w", err)
 	}
@@ -124,12 +114,9 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 // Build creates a container with all dependencies installed and configured.
 // It returns the configured container or nil if the build fails.
 func (m *Python) Build(ctx context.Context, source *dagger.Directory) *dagger.Container {
-	// Install dependencies using Poetry module
-	installedDir := dag.Poetry().Install(source)
-
 	return dag.Container().
 		From(fmt.Sprintf("python:%s", m.pythonVersion)).
-		WithDirectory(containerWorkdir, installedDir).
+		WithDirectory(containerWorkdir, dag.Poetry().Install(source)).
 		WithWorkdir(containerWorkdir)
 }
 
@@ -142,10 +129,8 @@ func (m *Python) Test(ctx context.Context, source *dagger.Directory) (string, er
 		return "", fmt.Errorf("poetry test failed: %w", err)
 	}
 
-	// Run Ruff checks using the ruff module
-	ruffModule := dag.Ruff()
-	lintRun := ruffModule.Lint(source)
-	if err := lintRun.Assert(ctx); err != nil {
+	// Run Ruff checks
+	if err := dag.Ruff().Lint(source).Assert(ctx); err != nil {
 		return "", fmt.Errorf("ruff check failed: %w", err)
 	}
 
