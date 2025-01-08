@@ -68,38 +68,36 @@ type Python struct {
 	gitName string
 }
 
-// Option configures a Python instance.
-type Option func(*Python)
-
-// WithPythonVersion sets the Python version.
-func WithPythonVersion(version string) Option {
-	return func(p *Python) {
-		p.pythonVersion = version
+// New creates a new instance of Python with the provided configuration.
+func New(
+	// Python version to use
+	// +optional
+	// +default="3.12-slim"
+	pythonVersion string,
+	// Git email for commits
+	// +optional
+	// +default="github-actions[bot]@users.noreply.github.com"
+	gitEmail string,
+	// Git username for commits
+	// +optional
+	// +default="github-actions[bot]"
+	gitName string,
+) *Python {
+	if pythonVersion == "" {
+		pythonVersion = DefaultPythonVersion
 	}
-}
-
-// WithGitConfig sets the Git configuration.
-func WithGitConfig(email, name string) Option {
-	return func(p *Python) {
-		p.gitEmail = email
-		p.gitName = name
+	if gitEmail == "" {
+		gitEmail = DefaultGitEmail
 	}
-}
-
-// New creates a new instance of Python with the provided options.
-// If no options are provided, default values will be used.
-func New(opts ...Option) *Python {
-	p := &Python{
-		pythonVersion: DefaultPythonVersion,
-		gitEmail:      DefaultGitEmail,
-		gitName:       DefaultGitName,
+	if gitName == "" {
+		gitName = DefaultGitName
 	}
 
-	for _, opt := range opts {
-		opt(p)
+	return &Python{
+		pythonVersion: pythonVersion,
+		gitEmail:      gitEmail,
+		gitName:       gitName,
 	}
-
-	return p
 }
 
 // Publish builds, tests, and publishes the Python package to PyPI and the container image.
