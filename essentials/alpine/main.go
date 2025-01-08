@@ -14,7 +14,7 @@ import (
 	"time"
 
 	goapk "chainguard.dev/apko/pkg/apk/apk"
-	"github.com/felipepimentel/daggerverse/alpine/internal/dagger"
+	"github.com/felipepimentel/daggerverse/essentials/alpine/internal/dagger"
 	"golang.org/x/mod/semver"
 	"golang.org/x/sync/errgroup"
 )

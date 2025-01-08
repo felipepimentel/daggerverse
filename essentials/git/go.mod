@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/git
+module github.com/felipepimentel/daggerverse/essentials/git
 
 go 1.22.7
 

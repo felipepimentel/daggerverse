@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/alpine
+module github.com/felipepimentel/daggerverse/essentials/alpine
 
 go 1.23.1
 

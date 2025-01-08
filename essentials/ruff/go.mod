@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/ruff
+module github.com/felipepimentel/daggerverse/essentials/ruff
 
 go 1.22.7
 

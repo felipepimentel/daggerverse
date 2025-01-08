@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/felipepimentel/daggerverse/ruff/internal/dagger"
+	"github.com/felipepimentel/daggerverse/essentials/ruff/internal/dagger"
 )
 
 // Ruff is a fast Python linter implemented in Rust

@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/versioner
+module github.com/felipepimentel/daggerverse/essentials/versioner
 
 go 1.22.7
 

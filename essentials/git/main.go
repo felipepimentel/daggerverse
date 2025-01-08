@@ -20,7 +20,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/felipepimentel/daggerverse/git/internal/dagger"
+	"github.com/felipepimentel/daggerverse/essentials/git/internal/dagger"
 
 	"golang.org/x/mod/semver"
 )

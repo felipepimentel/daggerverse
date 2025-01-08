@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/felipepimentel/daggerverse/versioner/internal/dagger"
+	"github.com/felipepimentel/daggerverse/essentials/versioner/internal/dagger"
 )
 
 // Versioner implements version management for repositories
