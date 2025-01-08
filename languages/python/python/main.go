@@ -19,6 +19,21 @@ const (
 	errPypiPublish    = "failed to publish to PyPI"
 )
 
+// Log messages for progress tracking.
+const (
+	logStartPublish    = "Starting publish process..."
+	logStartTests      = "Running tests..."
+	logStartLint       = "Running linting checks..."
+	logStartBuild      = "Building package..."
+	logStartPyPI       = "Publishing to PyPI..."
+	logStartContainer  = "Publishing container..."
+	logSuccessTests    = "All tests passed successfully!"
+	logSuccessLint     = "All linting checks passed!"
+	logSuccessPyPI     = "Package published successfully to PyPI"
+	logSuccessVersion  = "Using version: %s"
+	logSuccessPublish  = "Container published successfully to: %s"
+)
+
 // Python configuration defaults.
 const (
 	// DefaultPythonVersion is the default Python version to use.
@@ -90,7 +105,7 @@ func New(opts ...Option) *Python {
 // Publish builds, tests, and publishes the Python package to PyPI and the container image.
 // It returns the address of the published container or an error if any step fails.
 func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	fmt.Println("Starting publish process...")
+	fmt.Println(logStartPublish)
 
 	// Run tests first
 	if _, err := p.Test(ctx, source); err != nil {
@@ -103,16 +118,20 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
 	}
 
-	fmt.Printf("Using version: %s\n", version)
+	fmt.Printf(logSuccessVersion+"\n", version)
 
+	fmt.Println(logStartBuild)
 	// Build package using Poetry module
 	buildDir := dag.Poetry().Build(source)
 
+	fmt.Println(logStartPyPI)
 	// Publish to PyPI using the pypi module
 	if err := dag.Pypi().Publish(ctx, buildDir, token); err != nil {
 		return "", fmt.Errorf("%s: %w", errPypiPublish, err)
 	}
+	fmt.Println(logSuccessPyPI)
 
+	fmt.Println(logStartContainer)
 	// Publish container
 	address, err := dag.Container().
 		From(fmt.Sprintf("python:%s", p.pythonVersion)).
@@ -124,7 +143,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		return "", fmt.Errorf("%s: %w", errPublish, err)
 	}
 
-	fmt.Printf("Container published successfully to: %s\n", address)
+	fmt.Printf(logSuccessPublish+"\n", address)
 	return address, nil
 }
 
@@ -140,18 +159,35 @@ func (p *Python) Build(ctx context.Context, source *dagger.Directory) *dagger.Co
 // Test runs all quality checks and returns the combined test output.
 // It returns an error if any check fails.
 func (p *Python) Test(ctx context.Context, source *dagger.Directory) (string, error) {
+	fmt.Println(logStartTests)
+
 	// Run tests using Poetry module
 	testOutput, err := dag.Poetry().Test(ctx, source)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errPoetryTest, err)
 	}
 
-	// Run Ruff checks
-	if err := dag.Ruff().Lint(source).Assert(ctx); err != nil {
-		return "", fmt.Errorf("%s: %w", errRuffCheck, err)
+	fmt.Println(logSuccessTests)
+
+	// Run linting checks
+	if err := p.Lint(ctx, source); err != nil {
+		return "", err
 	}
 
-	return fmt.Sprintf("Test output:\n%s\nAll tests and checks passed successfully!", testOutput), nil
+	return fmt.Sprintf("Test output:\n%s", testOutput), nil
+}
+
+// Lint runs code quality checks using Ruff.
+// It returns an error if any check fails.
+func (p *Python) Lint(ctx context.Context, source *dagger.Directory) error {
+	fmt.Println(logStartLint)
+
+	if err := dag.Ruff().Lint(source).Assert(ctx); err != nil {
+		return fmt.Errorf("%s: %w", errRuffCheck, err)
+	}
+
+	fmt.Println(logSuccessLint)
+	return nil
 }
 
 // BuildEnv creates a development environment with all dependencies installed.
