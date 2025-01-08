@@ -16,6 +16,7 @@ const (
 	errPublish        = "failed to publish container"
 	errPoetryTest     = "poetry test failed"
 	errRuffCheck      = "ruff check failed"
+	errPypiPublish    = "failed to publish to PyPI"
 )
 
 // Python configuration defaults.
@@ -107,14 +108,16 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	// Build package using Poetry module
 	buildDir := dag.Poetry().Build(source)
 
-	// Use PyPI module for publishing
+	// Publish to PyPI using the pypi module
+	if err := dag.Pypi().Publish(ctx, buildDir, token); err != nil {
+		return "", fmt.Errorf("%s: %w", errPypiPublish, err)
+	}
+
+	// Publish container
 	address, err := dag.Container().
 		From(fmt.Sprintf("python:%s", p.pythonVersion)).
 		WithDirectory(containerWorkdir, buildDir).
 		WithWorkdir(containerWorkdir).
-		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token).
-		WithEnvVariable("VERSION", version).
-		WithExec([]string{"poetry", "publish", "--username", "__token__", "--no-interaction"}).
 		Publish(ctx, fmt.Sprintf(registryURLFmt, version))
 
 	if err != nil {
