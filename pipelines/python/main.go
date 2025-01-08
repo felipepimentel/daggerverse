@@ -67,13 +67,17 @@ type Python struct {
 	gitEmail string
 	// gitName is used for Git configuration.
 	gitName string
+	// dockerUsername is used for Docker Hub authentication.
+	dockerUsername string
+	// dockerPassword is used for Docker Hub authentication.
+	dockerPassword *dagger.Secret
 }
 
 // New creates a new instance of Python with the provided configuration.
 func New(
 	// Python version to use
 	// +optional
-	// +default="3.12-slim"
+	// +default="3.12-alpine"
 	pythonVersion string,
 	// Git email for commits
 	// +optional
@@ -83,6 +87,12 @@ func New(
 	// +optional
 	// +default="github-actions[bot]"
 	gitName string,
+	// Docker Hub username
+	// +optional
+	dockerUsername string,
+	// Docker Hub password
+	// +optional
+	dockerPassword *dagger.Secret,
 ) *Python {
 	if pythonVersion == "" {
 		pythonVersion = DefaultPythonVersion
@@ -95,14 +105,16 @@ func New(
 	}
 
 	return &Python{
-		pythonVersion: pythonVersion,
-		gitEmail:      gitEmail,
-		gitName:       gitName,
+		pythonVersion:   pythonVersion,
+		gitEmail:        gitEmail,
+		gitName:         gitName,
+		dockerUsername:  dockerUsername,
+		dockerPassword:  dockerPassword,
 	}
 }
 
-// Publish builds, tests, and publishes the Python package to PyPI and the container image.
-// It returns the address of the published container or an error if any step fails.
+// Publish builds, tests, and publishes the Python package to PyPI.
+// It returns the version of the published package or an error if any step fails.
 func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
 	fmt.Println(logStartPublish)
 
@@ -136,7 +148,14 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 // Build creates a container with all dependencies installed and configured.
 // It returns the configured container or nil if the build fails.
 func (p *Python) Build(ctx context.Context, source *dagger.Directory) *dagger.Container {
-	return dag.Container().
+	container := dag.Container()
+	
+	// Add Docker Hub authentication if credentials are provided
+	if p.dockerUsername != "" && p.dockerPassword != nil {
+		container = container.WithRegistryAuth("docker.io", p.dockerUsername, p.dockerPassword)
+	}
+	
+	return container.
 		From(fmt.Sprintf("python:%s", p.pythonVersion)).
 		WithDirectory(containerWorkdir, dag.Poetry().Install(source)).
 		WithWorkdir(containerWorkdir)
