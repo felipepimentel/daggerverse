@@ -52,6 +52,8 @@ func (m *Poetry) Install(source *dagger.Directory) *dagger.Directory {
 // Build builds the Python package using Poetry.
 func (m *Poetry) Build(source *dagger.Directory) *dagger.Directory {
 	container := m.getBaseContainer(source).
+		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
+		WithExec([]string{"poetry", "install", "--no-interaction"}).
 		WithExec([]string{"poetry", "build"})
 
 	return container.Directory("/src/dist")

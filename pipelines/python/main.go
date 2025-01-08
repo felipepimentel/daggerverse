@@ -38,7 +38,7 @@ const (
 // Python configuration defaults.
 const (
 	// DefaultPythonVersion is the default Python version to use.
-	DefaultPythonVersion = "3.12-slim"
+	DefaultPythonVersion = "3.12-alpine"
 )
 
 // Git configuration defaults.

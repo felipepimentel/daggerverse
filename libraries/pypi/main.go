@@ -19,11 +19,11 @@ type Pypi struct {
 func New(
 	// Base Python image to use
 	// +optional
-	// +default="python:3.12-slim"
+	// +default="python:3.12-alpine"
 	baseImage string,
 ) *Pypi {
 	if baseImage == "" {
-		baseImage = "python:3.12-slim"
+		baseImage = "python:3.12-alpine"
 	}
 
 	return &Pypi{
@@ -39,10 +39,11 @@ func (m *Pypi) Publish(ctx context.Context, source *dagger.Directory, token *dag
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry"}).
-		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+		WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token).
+		WithExec([]string{"ls", "-la"}) // Debug: list files
 
 	// Publish package
-	_, err := container.WithExec([]string{"poetry", "publish"}).Stdout(ctx)
+	_, err := container.WithExec([]string{"poetry", "publish", "--skip-existing"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error publishing package: %v", err)
 	}
