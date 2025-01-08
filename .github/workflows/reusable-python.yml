@@ -44,6 +44,6 @@ jobs:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           verb: call
-          module: github.com/felipepimentel/daggerverse/python@main
+          module: github.com/felipepimentel/daggerverse/pipelines/python@main
           args: publish --source ${{ inputs.source-path }} --token=env:PYPI_TOKEN
           version: ${{ inputs.dagger_version }}
