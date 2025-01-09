@@ -34,6 +34,11 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
       
+      - name: Install just-the-docs theme
+        run: |
+          cd docs
+          bundle add just-the-docs
+      
       - name: Build with Jekyll
         run: |
           cd docs
