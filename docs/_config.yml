@@ -1,6 +1,6 @@
 title: Daggerverse Documentation
 description: Documentation for Daggerverse modules and libraries
-theme: just-the-docs
+remote_theme: just-the-docs/just-the-docs@v0.5.2
 
 url: https://felipepimentel.github.io/daggerverse
 
