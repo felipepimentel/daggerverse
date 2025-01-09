@@ -2,12 +2,26 @@
 layout: default
 title: AWS CLI Module
 parent: Libraries
-nav_order: 2
+nav_order: 1
 ---
 
 # AWS CLI Module
+{: .fs-9 }
+
+Seamless integration with AWS Command Line Interface for Dagger pipelines.
+{: .fs-6 .fw-300 }
+
+[Get Started](#installation){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[View on GitHub](https://github.com/felipepimentel/daggerverse/tree/main/aws-cli){: .btn .fs-5 .mb-4 .mb-md-0 }
+
+---
+
+## Overview
 
 The AWS CLI module provides a seamless integration with AWS Command Line Interface, allowing you to interact with AWS services directly from your Dagger pipelines.
+
+{: .note }
+> This module requires AWS credentials to be configured properly. See the [Configuration](#configuration) section for details.
 
 ## Features
 
@@ -25,13 +39,13 @@ To use the AWS CLI module in your Dagger pipeline:
 ```go
 import (
     "dagger.io/dagger"
-    "github.com/felipepimentel/daggerverse/libraries/aws-cli"
+    awscli "github.com/felipepimentel/daggerverse/libraries/aws-cli"
 )
 ```
 
-## Usage Examples
+## Basic Usage
 
-### Basic AWS CLI Setup
+Here's a simple example of using the AWS CLI module:
 
 ```go
 func (m *MyModule) Example(ctx context.Context) (*Container, error) {
@@ -42,7 +56,11 @@ func (m *MyModule) Example(ctx context.Context) (*Container, error) {
 }
 ```
 
+## Configuration
+
 ### Custom Configuration
+
+You can customize the AWS CLI configuration:
 
 ```go
 func (m *MyModule) CustomConfig(ctx context.Context) (*Container, error) {
@@ -63,144 +81,91 @@ func (m *MyModule) CustomConfig(ctx context.Context) (*Container, error) {
 }
 ```
 
-### Using AWS Profiles
+### Environment Variables
+
+The module supports the following environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
+| `AWS_REGION` | AWS region |
+| `AWS_PROFILE` | AWS profile name |
+
+{: .important }
+> Always use secrets for storing sensitive AWS credentials. Never hardcode them in your pipeline code.
+
+## Examples
+
+### List S3 Buckets
 
 ```go
-func (m *MyModule) WithProfile(ctx context.Context) (*Container, error) {
-    awsCli := dag.AwsCli().New()
-    
-    // Mount AWS config and credentials
-    awsCli = awsCli.
-        WithConfig(dag.File("~/.aws/config")).
-        WithCredentials(dag.SetSecret("credentials", credentialsFile)).
-        WithProfile("production")
-    
-    return awsCli.Exec([]string{"eks", "list-clusters"}), nil
-}
+awsCli.Exec([]string{"s3", "ls"})
 ```
 
-## GitHub Actions Integration
+### Deploy to ECS
 
-You can use this module in your GitHub Actions workflows:
-
-```yaml
-name: AWS Operations
-on: [push]
-
-jobs:
-  aws-ops:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: AWS Operations with Dagger
-        uses: dagger/dagger-action@v1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        with:
-          module: github.com/felipepimentel/daggerverse/libraries/aws-cli
-          args: |
-            do -p '
-              aws := AwsCli().New()
-              aws.WithStaticCredentials(
-                dag.SetSecret("AWS_ACCESS_KEY_ID", dag.SetSecret("key", AWS_ACCESS_KEY_ID)),
-                dag.SetSecret("AWS_SECRET_ACCESS_KEY", dag.SetSecret("secret", AWS_SECRET_ACCESS_KEY)),
-              ).Exec(["s3", "ls"])
-            '
+```go
+awsCli.Exec([]string{
+    "ecs", "update-service",
+    "--cluster", "my-cluster",
+    "--service", "my-service",
+    "--force-new-deployment"
+})
 ```
 
-## API Reference
+### Using Temporary Credentials
 
-### AwsCli
-
-Main module struct that provides access to AWS CLI functionality.
-
-#### Constructor
-
-- `New(version string, container *Container, region string) AwsCli`
-  - Creates a new AWS CLI instance
-  - Parameters:
-    - `version`: AWS CLI version (optional, defaults to "latest")
-    - `container`: Custom base container (optional)
-    - `region`: Default AWS region (optional)
-
-#### Methods
-
-- `WithRegion(region string) AwsCli`
-  - Sets the AWS region for all commands
-  
-- `WithConfig(source *File) AwsCli`
-  - Mounts an AWS CLI config file
-  
-- `WithCredentials(source *Secret) AwsCli`
-  - Mounts an AWS CLI credentials file
-  
-- `WithProfile(profile string) AwsCli`
-  - Sets the AWS profile for all commands
-  
-- `WithStaticCredentials(accessKeyId *Secret, secretAccessKey *Secret, sessionToken *Secret) AwsCli`
-  - Sets static AWS credentials
-  - `sessionToken` is optional for permanent credentials
-  
-- `WithTemporaryCredentials(accessKeyId *Secret, secretAccessKey *Secret, sessionToken *Secret) AwsCli`
-  - Sets temporary AWS credentials (requires session token)
-  
-- `WithoutStaticCredentials() AwsCli`
-  - Removes previously set static credentials
-  
-- `Exec(args []string) *Container`
-  - Executes an AWS CLI command
+```go
+awsCli.WithTemporaryCredentials(
+    dag.SetSecret("AWS_ACCESS_KEY_ID", tempKey),
+    dag.SetSecret("AWS_SECRET_ACCESS_KEY", tempSecret),
+    dag.SetSecret("AWS_SESSION_TOKEN", sessionToken),
+)
+```
 
 ## Best Practices
 
-1. **Credential Management**
-   - Use secrets for storing credentials
-   - Prefer IAM roles when possible
-   - Rotate credentials regularly
-
-2. **Region Selection**
-   - Set explicit regions for predictability
-   - Use environment-specific regions
-
-3. **Error Handling**
-   - Check command output for errors
-   - Implement proper error handling in pipelines
-
-4. **Security**
-   - Never commit credentials to source control
-   - Use temporary credentials when possible
-   - Follow the principle of least privilege
+1. Always use secrets for credentials
+2. Set specific AWS CLI versions for reproducibility
+3. Configure region explicitly when needed
+4. Use temporary credentials when possible
+5. Follow the principle of least privilege
 
 ## Troubleshooting
 
 Common issues and solutions:
 
-1. **Authentication Failures**
-   ```
-   Error: Unable to locate credentials
-   Solution: Ensure credentials are properly mounted or environment variables are set
-   ```
+{: .warning }
+> If you encounter permission errors, ensure your AWS credentials have the necessary IAM permissions.
 
-2. **Region Issues**
-   ```
-   Error: Region is required
-   Solution: Set region using WithRegion() or in AWS config
-   ```
+1. **Credentials not found**
+   - Check if credentials are properly set
+   - Verify secret names match exactly
 
-3. **Profile Problems**
-   ```
-   Error: Profile not found
-   Solution: Verify profile exists in mounted config and credentials files
-   ```
+2. **Region issues**
+   - Explicitly set region in configuration
+   - Check for environment variable conflicts
 
-## Environment Variables
+## API Reference
 
-The module respects standard AWS environment variables:
+### Core Methods
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_SESSION_TOKEN`
-- `AWS_REGION`
-- `AWS_PROFILE`
+| Method | Description |
+|--------|-------------|
+| `New()` | Create new AWS CLI instance |
+| `Exec([]string)` | Execute AWS CLI command |
+| `WithStaticCredentials()` | Configure static credentials |
+| `WithTemporaryCredentials()` | Configure temporary credentials |
 
-These can be set using the appropriate `With*` methods or through GitHub Actions secrets. 
+### Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `Version` | string | AWS CLI version |
+| `Region` | string | AWS region |
+| `Profile` | string | AWS profile name |
+
+## Contributing
+
+Please read our [Contributing Guidelines](https://github.com/felipepimentel/daggerverse/blob/main/CONTRIBUTING.md) for details on submitting pull requests. 

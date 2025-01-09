@@ -6,31 +6,25 @@ url: https://felipepimentel.github.io
 baseurl: "/daggerverse"
 
 # Theme settings
-logo: "/assets/images/logo.png"
-favicon_ico: "/assets/images/favicon.ico"
-
-# Enable or disable the site search
+heading_anchors: true
+color_scheme: dark
 search_enabled: true
-search:
-  heading_level: 2
-  previews: 3
-  preview_words_before: 5
-  preview_words_after: 10
-  tokenizer_separator: /[\s/]+/
-  rel_url: true
-  button: false
+enable_copy_code_button: true
 
-# Aux links for the upper right navigation
+# Navigation
+nav_external_links:
+  - title: Dagger Documentation
+    url: https://docs.dagger.io
+    hide_icon: false
+  - title: GitHub Repository
+    url: https://github.com/felipepimentel/daggerverse
+    hide_icon: false
+
+# Aux links
 aux_links:
-  "GitHub Repository": 
+  "View on GitHub":
     - "https://github.com/felipepimentel/daggerverse"
 aux_links_new_tab: true
-
-# Makes Aux links open in a new tab
-aux_links_new_tab: true
-
-# Color scheme supports "light" (default) and "dark"
-color_scheme: dark
 
 # Back to top link
 back_to_top: true
@@ -39,28 +33,39 @@ back_to_top_text: "Back to top"
 # Footer content
 footer_content: "Copyright &copy; 2024 Felipe Pimentel. Distributed under the <a href=\"https://github.com/felipepimentel/daggerverse/blob/main/LICENSE\">Apache License 2.0.</a>"
 
-# Collections for organizing content
+# Collections
 collections:
   libraries:
-    permalink: "/:collection/:path"
+    permalink: /:collection/:path/
     output: true
   essentials:
-    permalink: "/:collection/:path"
+    permalink: /:collection/:path/
     output: true
 
-# Enable or disable heading anchors
-heading_anchors: true
+# Default layouts
+defaults:
+  - scope:
+      path: ""
+      type: libraries
+    values:
+      layout: default
+      parent: Libraries
+  - scope:
+      path: ""
+      type: essentials
+    values:
+      layout: default
+      parent: Essentials
 
-# Enable or disable copy buttons on code blocks
-enable_copy_code_button: true
-
-# Footer "Edit this page on GitHub" link text
-gh_edit_link: true
-gh_edit_link_text: "Edit this page on GitHub"
-gh_edit_repository: "https://github.com/felipepimentel/daggerverse"
-gh_edit_branch: "main"
-gh_edit_source: docs
-gh_edit_view_mode: "tree"
+# Search
+search:
+  heading_level: 3
+  previews: 3
+  preview_words_before: 5
+  preview_words_after: 10
+  tokenizer_separator: /[\s/]+/
+  rel_url: true
+  button: false
 
 # Callouts
 callouts:
@@ -77,17 +82,33 @@ callouts:
     title: Important
     color: blue
 
-# Default YAML front matter
-defaults:
-  - scope:
-      path: ""
-      type: libraries
-    values:
-      layout: default
-      parent: Libraries
-  - scope:
-      path: ""
-      type: essentials
-    values:
-      layout: default
-      parent: Essentials 
+# Buttons
+buttons:
+  primary:
+    color: blue
+  secondary:
+    color: grey
+
+# Code copy button
+enable_copy_code_button: true
+
+# Heading anchors
+heading_anchors: true
+
+# Footer links
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/felipepimentel/daggerverse"
+gh_edit_branch: "main"
+gh_edit_source: docs
+gh_edit_view_mode: "tree"
+
+# Exclude files from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/ 
