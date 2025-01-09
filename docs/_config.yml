@@ -26,11 +26,40 @@ footer_content: "Copyright &copy; 2024 Felipe Pimentel. Distributed under the <a
 # Collections for organizing content
 collections:
   libraries:
-    permalink: "/:collection/:path/"
+    permalink: "/:collection/:path"
     output: true
   essentials:
-    permalink: "/:collection/:path/"
+    permalink: "/:collection/:path"
     output: true
+
+# Enable or disable heading anchors
+heading_anchors: true
+
+# Makes Aux links open in a new tab
+aux_links_new_tab: true
+
+# Enable or disable copy buttons on code blocks
+enable_copy_code_button: true
+
+# Footer "Edit this page on GitHub" link text
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/felipepimentel/daggerverse"
+gh_edit_branch: "main"
+gh_edit_source: docs
+gh_edit_view_mode: "tree"
+
+# Callouts
+callouts:
+  warning:
+    title: Warning
+    color: red
+  note:
+    title: Note
+    color: blue
+  tip:
+    title: Tip
+    color: green
 
 # Default YAML front matter
 defaults:
