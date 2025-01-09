@@ -1,0 +1,12 @@
+{
+  "name": "wolfi",
+  "engineVersion": "v0.15.1",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "apko",
+      "source": "../apko"
+    }
+  ],
+  "source": "."
+}
