@@ -1,0 +1,48 @@
+title: Daggerverse Documentation
+description: Documentation for Daggerverse modules and libraries
+theme: just-the-docs
+
+url: https://felipepimentel.github.io/daggerverse
+
+aux_links:
+  Repository: https://github.com/felipepimentel/daggerverse
+
+# Enable or disable the site search
+search_enabled: true
+
+# Aux links for the upper right navigation
+aux_links_new_tab: true
+
+# Color scheme supports "light" (default) and "dark"
+color_scheme: light
+
+# Back to top link
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Footer content
+footer_content: "Copyright &copy; 2024 Felipe Pimentel. Distributed under the <a href=\"https://github.com/felipepimentel/daggerverse/blob/main/LICENSE\">Apache License 2.0.</a>"
+
+# Collections for organizing content
+collections:
+  libraries:
+    permalink: "/:collection/:path/"
+    output: true
+  essentials:
+    permalink: "/:collection/:path/"
+    output: true
+
+# Default YAML front matter
+defaults:
+  - scope:
+      path: ""
+      type: libraries
+    values:
+      layout: default
+      parent: Libraries
+  - scope:
+      path: ""
+      type: essentials
+    values:
+      layout: default
+      parent: Essentials 
