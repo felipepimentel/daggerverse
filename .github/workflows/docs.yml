@@ -37,8 +37,9 @@ jobs:
       - name: Build with Jekyll
         run: |
           cd docs
+          bundle config set --local path 'vendor/bundle'
           bundle install
-          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}" --trace
         env:
           JEKYLL_ENV: production
       
