@@ -2,6 +2,7 @@ title: Daggerverse Documentation
 description: Documentation for Daggerverse modules and libraries
 url: https://felipepimentel.github.io
 baseurl: "/daggerverse"
+theme: just-the-docs
 
 # Theme settings
 heading_anchors: true
