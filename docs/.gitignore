@@ -1,0 +1,11 @@
+/libraries
+/essentials
+/vendor
+/.jekyll-cache
+/.jekyll-metadata
+/.jekyll-build
+/.jekyll-build-error.log
+/.jekyll-build-output.log
+/.jekyll-build-warnings.log
+/.bundle
+/_site
