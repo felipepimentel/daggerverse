@@ -307,22 +307,38 @@ func (d *Digitalocean) DeployN8N(ctx context.Context, config N8NAppConfig) (*dag
 	return d.DeployApp(ctx, config.AppConfig)
 }
 
-// GetN8NAppStatus returns the status and URL of a deployed n8n app
-func (d *Digitalocean) GetN8NAppStatus(ctx context.Context, appID string) (string, string, error) {
+// N8NAppStatus represents the status of an n8n app deployment
+type N8NAppStatus struct {
+	Status string
+	URL    string
+}
+
+// GetN8NAppStatus returns the status and URL of an n8n app deployment
+func (d *Digitalocean) GetN8NAppStatus(ctx context.Context, appID string) (*N8NAppStatus, error) {
 	client, err := d.getClient()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	app, _, err := client.Apps.Get(ctx, appID)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	var url string
-	if app.LiveDomain != "" {
-		url = fmt.Sprintf("https://%s", app.LiveDomain)
+	if app.ActiveDeployment == nil {
+		return &N8NAppStatus{
+			Status: "NO_DEPLOYMENT",
+			URL:    "",
+		}, nil
 	}
 
-	return string(app.ActiveDeployment.Phase), url, nil
+	var appURL string
+	if len(app.DefaultIngress) > 0 {
+		appURL = fmt.Sprintf("https://%s", app.DefaultIngress)
+	}
+
+	return &N8NAppStatus{
+		Status: string(app.ActiveDeployment.Phase),
+		URL:    appURL,
+	}, nil
 }

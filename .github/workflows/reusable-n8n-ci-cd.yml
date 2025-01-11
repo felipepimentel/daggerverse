@@ -7,7 +7,7 @@ on:
         description: 'Version of Dagger to use'
         required: false
         type: string
-        default: '0.9.3'
+        default: '0.15.1'
       region:
         description: 'DigitalOcean region'
         required: false
@@ -35,11 +35,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Dagger
-        uses: dagger/dagger-for-github@v5
+        uses: dagger/dagger-for-github@v7
         with:
           version: ${{ inputs.dagger_version }}
+          
+      - name: Cache Dagger
+        uses: actions/cache@v3
+        with:
+          path: ~/.dagger
+          key: ${{ runner.os }}-dagger-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-dagger-
 
       - name: Run CI
         run: |
@@ -53,11 +63,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Dagger
-        uses: dagger/dagger-for-github@v5
+        uses: dagger/dagger-for-github@v7
         with:
           version: ${{ inputs.dagger_version }}
+          
+      - name: Cache Dagger
+        uses: actions/cache@v3
+        with:
+          path: ~/.dagger
+          key: ${{ runner.os }}-dagger-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-dagger-
 
       - name: Deploy to DigitalOcean
         env:
