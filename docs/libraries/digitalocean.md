@@ -33,6 +33,10 @@ func main() {
         AppConfig: digitalocean.AppConfig{
             Name:   "my-n8n",
             Region: "nyc",
+            EnvVars: []digitalocean.EnvVar{
+                {Key: "N8N_BASIC_AUTH_ACTIVE", Value: "true"},
+                {Key: "N8N_BASIC_AUTH_USER", Value: "admin"},
+            },
         },
         WebhookURL: "https://my-n8n.example.com",
     }
@@ -56,10 +60,10 @@ func deployN8N(ctx context.Context, token, appName string) error {
             Region:       "fra1",
             InstanceSize: "basic-xs",
             InstanceCount: 2,
-            EnvVars: map[string]string{
-                "N8N_BASIC_AUTH_ACTIVE": "true",
-                "N8N_BASIC_AUTH_USER":   "admin",
-                "N8N_PROTOCOL":          "https",
+            EnvVars: []digitalocean.EnvVar{
+                {Key: "N8N_BASIC_AUTH_ACTIVE", Value: "true"},
+                {Key: "N8N_BASIC_AUTH_USER", Value: "admin"},
+                {Key: "N8N_PROTOCOL", Value: "https"},
             },
             HealthCheckPath: "/healthz",
             HTTPPort:       5678,
@@ -101,6 +105,17 @@ type Digitalocean struct {
 }
 ```
 
+#### `EnvVar`
+
+Environment variable representation.
+
+```go
+type EnvVar struct {
+    Key   string
+    Value string
+}
+```
+
 #### `AppConfig`
 
 Configuration for DigitalOcean app deployments.
@@ -112,7 +127,7 @@ type AppConfig struct {
     InstanceSize     string
     InstanceCount    int64
     Container        Container
-    EnvVars         map[string]string
+    EnvVars         []EnvVar
     HealthCheckPath  string
     HTTPPort        int
 }

@@ -15,6 +15,12 @@ type Digitalocean struct {
 	Token string // DigitalOcean API token
 }
 
+// EnvVar represents an environment variable
+type EnvVar struct {
+	Key   string
+	Value string
+}
+
 // AppConfig represents configuration for a DigitalOcean app
 type AppConfig struct {
 	Name             string
@@ -22,7 +28,7 @@ type AppConfig struct {
 	InstanceSize     string
 	InstanceCount    int64
 	Container        Container
-	EnvVars         map[string]string
+	EnvVars         []EnvVar
 	HealthCheckPath  string
 	HTTPPort        int
 }
@@ -164,10 +170,10 @@ func (d *Digitalocean) DeployApp(ctx context.Context, config AppConfig) (*dagger
 
 	// Convert environment variables to EnvVar format
 	envVars := make([]*godo.AppVariableDefinition, 0, len(config.EnvVars))
-	for key, value := range config.EnvVars {
+	for _, env := range config.EnvVars {
 		envVars = append(envVars, &godo.AppVariableDefinition{
-			Key:   key,
-			Value: value,
+			Key:   env.Key,
+			Value: env.Value,
 			Type:  godo.AppVariableType_General,
 			Scope: godo.AppVariableScope_RunTime,
 		})
@@ -277,27 +283,35 @@ func (d *Digitalocean) DeployN8N(ctx context.Context, config N8NAppConfig) (*dag
 		config.HTTPPort = 5678 // Default n8n port
 	}
 
-	// Add n8n-specific environment variables
+	// Initialize environment variables slice if nil
 	if config.EnvVars == nil {
-		config.EnvVars = make(map[string]string)
+		config.EnvVars = make([]EnvVar, 0)
 	}
 	
-	// Set required n8n environment variables
-	config.EnvVars["N8N_PORT"] = fmt.Sprintf("%d", config.HTTPPort)
-	config.EnvVars["N8N_PROTOCOL"] = "https"
-	config.EnvVars["NODE_ENV"] = "production"
+	// Add n8n-specific environment variables
+	config.EnvVars = append(config.EnvVars,
+		EnvVar{Key: "N8N_PORT", Value: fmt.Sprintf("%d", config.HTTPPort)},
+		EnvVar{Key: "N8N_PROTOCOL", Value: "https"},
+		EnvVar{Key: "NODE_ENV", Value: "production"},
+	)
 	
 	if config.DatabaseURL != "" {
-		config.EnvVars["DB_TYPE"] = "postgresdb"
-		config.EnvVars["DB_POSTGRESDB_DATABASE"] = config.DatabaseURL
+		config.EnvVars = append(config.EnvVars,
+			EnvVar{Key: "DB_TYPE", Value: "postgresdb"},
+			EnvVar{Key: "DB_POSTGRESDB_DATABASE", Value: config.DatabaseURL},
+		)
 	}
 	
 	if config.WebhookURL != "" {
-		config.EnvVars["WEBHOOK_URL"] = config.WebhookURL
+		config.EnvVars = append(config.EnvVars,
+			EnvVar{Key: "WEBHOOK_URL", Value: config.WebhookURL},
+		)
 	}
 	
 	if config.EncKey != "" {
-		config.EnvVars["N8N_ENCRYPTION_KEY"] = config.EncKey
+		config.EnvVars = append(config.EnvVars,
+			EnvVar{Key: "N8N_ENCRYPTION_KEY", Value: config.EncKey},
+		)
 	}
 
 	// Set health check path for n8n
