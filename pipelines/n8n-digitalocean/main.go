@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 
-	do "dagger/digitalocean"
-	docker "dagger/docker"
-	n8n "dagger/n8n"
+	do "github.com/felipepimentel/daggerverse/libraries/digitalocean"
+	docker "github.com/felipepimentel/daggerverse/libraries/docker"
+	n8n "github.com/felipepimentel/daggerverse/pipelines/n8n"
 
 	"dagger.io/dagger"
 )

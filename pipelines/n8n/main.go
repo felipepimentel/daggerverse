@@ -13,7 +13,7 @@ type N8N struct {
 	// Source directory containing n8n configuration
 	Source *dagger.Directory
 	// Environment variables for n8n
-	EnvVars map[string]string
+	EnvVars []EnvVar
 	// Port to expose n8n on
 	Port int
 	// Registry to publish to
@@ -24,6 +24,12 @@ type N8N struct {
 	RegistryAuth *dagger.Secret
 	// DigitalOcean configuration
 	DOConfig *DOConfig
+}
+
+// EnvVar represents an environment variable
+type EnvVar struct {
+	Name  string
+	Value string
 }
 
 // DOConfig represents DigitalOcean-specific configuration
@@ -47,8 +53,8 @@ func (n *N8N) Build(ctx context.Context) (*dagger.Container, error) {
 		WithExec([]string{"npm", "install", "-g", "n8n"})
 
 	// Set environment variables
-	for key, value := range n.EnvVars {
-		container = container.WithEnvVariable(key, value)
+	for _, env := range n.EnvVars {
+		container = container.WithEnvVariable(env.Name, env.Value)
 	}
 
 	// Set default port if not specified
@@ -57,8 +63,8 @@ func (n *N8N) Build(ctx context.Context) (*dagger.Container, error) {
 	}
 
 	return container.
-		WithExposedPort(n.Port).
-		WithEntrypoint([]string{"n8n", "start"}), nil
+			WithExposedPort(n.Port).
+			WithEntrypoint([]string{"n8n", "start"}), nil
 }
 
 // Test runs n8n tests
