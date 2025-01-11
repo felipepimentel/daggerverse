@@ -1,5 +1,6 @@
 {
   "name": "n8n-digitalocean",
   "engineVersion": "v0.15.1",
-  "sdk": "go"
+  "sdk": "go",
+  "source": "."
 }
