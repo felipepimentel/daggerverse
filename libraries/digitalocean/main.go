@@ -42,24 +42,20 @@ type N8NAppConfig struct {
 }
 
 // Container represents a Dagger container
-type Container interface {
-	WithRegistryAuth(registry, username string, secret Secret) Container
-	Publish(ctx context.Context, ref string) (string, error)
-}
+type Container = *dagger.Container
 
 // Secret represents a Dagger secret
-type Secret interface {
-	Plaintext(ctx context.Context) (string, error)
+type Secret = *dagger.Secret
+
+// New creates a new Digitalocean client
+func New() *Digitalocean {
+	return &Digitalocean{}
 }
 
-// StringSecret is a simple string-based secret
-type StringSecret struct {
-	value string
-}
-
-// Plaintext returns the secret value
-func (s *StringSecret) Plaintext(ctx context.Context) (string, error) {
-	return s.value, nil
+// WithToken sets the DigitalOcean API token
+func (d *Digitalocean) WithToken(token string) *Digitalocean {
+	d.Token = token
+	return d
 }
 
 // getClient creates a new DigitalOcean API client
@@ -207,11 +203,14 @@ func (d *Digitalocean) DeployApp(ctx context.Context, config AppConfig) (*dagger
 		return nil, fmt.Errorf("failed to create app: %w", err)
 	}
 
+	// Create a secret for the token
+	secret := dag.SetSecret("do_token", d.Token)
+
 	// Push container to DO registry
 	registryContainer := config.Container.WithRegistryAuth(
 		"registry.digitalocean.com",
 		"",
-		&StringSecret{value: d.Token},
+		secret,
 	)
 
 	_, err = registryContainer.Publish(ctx, fmt.Sprintf("registry.digitalocean.com/%s:latest", config.Name))
