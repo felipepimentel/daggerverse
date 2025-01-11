@@ -1,38 +1,79 @@
-// A generated module for N8NDigitalocean functions
-//
-// This module has been generated via dagger init and serves as a reference to
-// basic module structure as you get started with Dagger.
-//
-// Two functions have been pre-created. You can modify, delete, or add to them,
-// as needed. They demonstrate usage of arguments and return types using simple
-// echo and grep commands. The functions can be called from the dagger CLI or
-// from one of the SDKs.
-//
-// The first line in this comment block is a short description line and the
-// rest is a long description with more detail on the module's purpose or usage,
-// if appropriate. All modules should have a short description.
-
+// Package main provides a Dagger module for deploying n8n to DigitalOcean
 package main
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/felipepimentel/daggerverse/pipelines/n8n-digitalocean/internal/dagger"
+	do "dagger/digitalocean"
+	docker "dagger/docker"
+	n8n "dagger/n8n"
+
+	"dagger.io/dagger"
 )
 
-type N8NDigitalocean struct{}
-
-// Returns a container that echoes whatever string argument is provided
-func (m *N8NDigitalocean) ContainerEcho(stringArg string) *dagger.Container {
-	return dag.Container().From("alpine:latest").WithExec([]string{"echo", stringArg})
+// N8NDigitalOcean represents the n8n deployment pipeline for DigitalOcean
+type N8NDigitalOcean struct {
+	// N8N pipeline configuration
+	N8N *n8n.N8N
+	// DigitalOcean configuration
+	DigitalOcean *do.Digitalocean
+	// Docker configuration for building and pushing images
+	Docker *docker.Docker
+	// Application configuration
+	AppName      string
+	Region       string
+	InstanceSize string
+	DatabaseURL  string
+	WebhookURL   string
+	EncKey       string
 }
 
-// Returns lines that match a pattern in the files of the provided Directory
-func (m *N8NDigitalocean) GrepDir(ctx context.Context, directoryArg *dagger.Directory, pattern string) (string, error) {
-	return dag.Container().
-		From("alpine:latest").
-		WithMountedDirectory("/mnt", directoryArg).
-		WithWorkdir("/mnt").
-		WithExec([]string{"grep", "-R", pattern, "."}).
-		Stdout(ctx)
+// Deploy builds and deploys n8n to DigitalOcean
+func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error) {
+	if n.N8N == nil {
+		return nil, fmt.Errorf("n8n configuration is required")
+	}
+	if n.DigitalOcean == nil {
+		return nil, fmt.Errorf("digitalocean configuration is required")
+	}
+	if n.Docker == nil {
+		return nil, fmt.Errorf("docker configuration is required")
+	}
+
+	// Build and publish n8n container
+	container, err := n.N8N.CD(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build and publish n8n: %w", err)
+	}
+
+	// Configure n8n app deployment
+	appConfig := do.N8NAppConfig{
+		AppConfig: do.AppConfig{
+			Name:         n.AppName,
+			Region:       n.Region,
+			InstanceSize: n.InstanceSize,
+			Container:    container,
+		},
+		DatabaseURL: n.DatabaseURL,
+		WebhookURL:  n.WebhookURL,
+		EncKey:      n.EncKey,
+	}
+
+	// Deploy to DigitalOcean
+	deployedApp, err := n.DigitalOcean.DeployN8N(ctx, appConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy n8n to DigitalOcean: %w", err)
+	}
+
+	return deployedApp, nil
+}
+
+// GetStatus returns the deployment status and URL of the n8n app
+func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (string, string, error) {
+	if n.DigitalOcean == nil {
+		return "", "", fmt.Errorf("digitalocean configuration is required")
+	}
+
+	return n.DigitalOcean.GetN8NAppStatus(ctx, appID)
 }
