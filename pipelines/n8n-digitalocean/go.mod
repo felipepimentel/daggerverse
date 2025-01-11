@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/pipelines/n8n
+module github.com/felipepimentel/daggerverse/pipelines/n8n-digitalocean
 
 go 1.22.7
 
