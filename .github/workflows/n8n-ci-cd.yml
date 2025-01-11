@@ -16,47 +16,8 @@ on:
       - 'libraries/digitalocean/**'
       - '.github/workflows/n8n-ci-cd.yml'
 
-env:
-  DAGGER_VERSION: "0.9.3"
-
 jobs:
-  ci:
-    name: CI
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Dagger
-        uses: dagger/dagger-for-github@v5
-        with:
-          version: ${{ env.DAGGER_VERSION }}
-
-      - name: Run CI
-        run: |
-          dagger call ci --source .
-
-  cd:
-    name: CD
-    needs: ci
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Dagger
-        uses: dagger/dagger-for-github@v5
-        with:
-          version: ${{ env.DAGGER_VERSION }}
-
-      - name: Deploy to DigitalOcean
-        env:
-          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
-        run: |
-          dagger call deploy \
-            --source . \
-            --token "$DIGITALOCEAN_TOKEN" \
-            --region "nyc" \
-            --app-name "n8n" \
-            --env-vars '{"N8N_BASIC_AUTH_ACTIVE": "true", "N8N_BASIC_AUTH_USER": "admin"}' 
+  n8n-ci-cd:
+    uses: ./.github/workflows/reusable-n8n-ci-cd.yml
+    secrets:
+      digitalocean_token: ${{ secrets.DIGITALOCEAN_TOKEN }} 

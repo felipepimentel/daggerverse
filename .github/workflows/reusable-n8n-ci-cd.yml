@@ -1,0 +1,71 @@
+name: Reusable n8n CI/CD
+
+on:
+  workflow_call:
+    inputs:
+      dagger_version:
+        description: 'Version of Dagger to use'
+        required: false
+        type: string
+        default: '0.9.3'
+      region:
+        description: 'DigitalOcean region'
+        required: false
+        type: string
+        default: 'nyc'
+      app_name:
+        description: 'n8n app name'
+        required: false
+        type: string
+        default: 'n8n'
+      env_vars:
+        description: 'Environment variables for n8n'
+        required: false
+        type: string
+        default: '{"N8N_BASIC_AUTH_ACTIVE": "true", "N8N_BASIC_AUTH_USER": "admin"}'
+    secrets:
+      digitalocean_token:
+        description: 'DigitalOcean API token'
+        required: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Dagger
+        uses: dagger/dagger-for-github@v5
+        with:
+          version: ${{ inputs.dagger_version }}
+
+      - name: Run CI
+        run: |
+          dagger call ci --source .
+
+  cd:
+    name: CD
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Dagger
+        uses: dagger/dagger-for-github@v5
+        with:
+          version: ${{ inputs.dagger_version }}
+
+      - name: Deploy to DigitalOcean
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.digitalocean_token }}
+        run: |
+          dagger call deploy \
+            --source . \
+            --token "$DIGITALOCEAN_TOKEN" \
+            --region "${{ inputs.region }}" \
+            --app-name "${{ inputs.app_name }}" \
+            --env-vars '${{ inputs.env_vars }}' 
