@@ -58,9 +58,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dagger-
 
-      - name: Run CI
-        working-directory: pipelines/n8n-digitalocean
+      - name: Verify Directory Structure
         run: |
+          pwd
+          ls -la
+          echo "Current directory structure:"
+          tree -L 2 || true
+
+      - name: Run CI
+        run: |
+          cd pipelines/n8n-digitalocean
           dagger call ci
 
   cd:
@@ -97,10 +104,22 @@ jobs:
       - name: Deploy to DigitalOcean
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.digitalocean_token }}
-        working-directory: pipelines/n8n-digitalocean
         run: |
+          cd pipelines/n8n-digitalocean
           dagger call deploy \
             --token "$DIGITALOCEAN_TOKEN" \
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
-            --env-vars '${{ inputs.env_vars }}' 
+            --env-vars '${{ inputs.env_vars }}'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Sync Repository
+        run: |
+          git pull origin main
+          git add .
+          git commit -m "chore(release): sync repository after deployment [skip ci]" || echo "No changes to commit"
+          git push origin main 
