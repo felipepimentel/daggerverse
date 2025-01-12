@@ -28,10 +28,10 @@ on:
         required: true
         type: string
       workdir:
-        description: 'Working directory containing the Dagger pipeline'
+        description: 'Working directory containing the Dagger pipeline. Points to the n8n-digitalocean module in daggerverse.'
         required: false
         type: string
-        default: '.'
+        default: 'pipelines/n8n-digitalocean'
     secrets:
       digitalocean_token:
         description: 'DigitalOcean API token'
@@ -79,7 +79,7 @@ jobs:
         run: |
           cd ${{ inputs.workdir }}
           dagger call ci \
-            --n8n-repo "../n8n-repo"
+            --n8n-repo "../../n8n-repo"
 
   cd:
     name: CD
@@ -130,7 +130,7 @@ jobs:
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
             --env-vars '${{ inputs.env_vars }}' \
-            --n8n-repo "../n8n-repo"
+            --n8n-repo "../../n8n-repo"
 
       - name: Configure Git
         working-directory: n8n-repo
