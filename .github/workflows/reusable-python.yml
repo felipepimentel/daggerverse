@@ -13,14 +13,14 @@ on:
         default: "0.9.8"
         required: false
         type: string
-      run_tests:
-        description: "Whether to run unit tests"
-        default: true
+      skip_tests:
+        description: "Whether to skip running tests"
+        default: false
         required: false
         type: boolean
-      run_lint:
-        description: "Whether to run linting checks"
-        default: true
+      skip_lint:
+        description: "Whether to skip running linting checks"
+        default: false
         required: false
         type: boolean
       publish_pypi:
@@ -33,11 +33,6 @@ on:
         default: false
         required: false
         type: boolean
-      python_version:
-        description: "Python version to use"
-        default: "3.12-alpine"
-        required: false
-        type: string
     secrets:
       PYPI_TOKEN:
         description: "PyPI token for publishing"
@@ -81,10 +76,9 @@ jobs:
           args: >-
             ${{ inputs.publish_pypi && 'publish' || 'test' }}
             --source ${{ inputs.source-path }}
-            --python-version ${{ inputs.python_version }}
             ${{ inputs.publish_pypi && format('--token=env:PYPI_TOKEN') || '' }}
             ${{ inputs.build_container && secrets.DOCKER_USERNAME && format('--docker-username=env:DOCKER_USERNAME') || '' }}
             ${{ inputs.build_container && secrets.DOCKER_PASSWORD && format('--docker-password=env:DOCKER_PASSWORD') || '' }}
-            ${{ inputs.run_tests && '--run-tests' || '--skip-tests' }}
-            ${{ inputs.run_lint && '--run-lint' || '--skip-lint' }}
+            ${{ inputs.skip_tests && '--skip-tests' || '' }}
+            ${{ inputs.skip_lint && '--skip-lint' || '' }}
           version: ${{ inputs.dagger_version }}
