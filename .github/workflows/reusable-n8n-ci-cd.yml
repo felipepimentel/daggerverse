@@ -27,13 +27,18 @@ on:
         required: false
         type: string
         default: 'pipelines/n8n-digitalocean'
+      n8n_basic_auth_password:
+        description: 'Password for n8n basic auth'
+        required: false
+        type: string
+        default: 'n8n-admin-password'
     secrets:
       DIGITALOCEAN_ACCESS_TOKEN:
         description: 'DigitalOcean API token'
         required: true
       N8N_BASIC_AUTH_PASSWORD:
-        description: 'Password for n8n basic auth'
-        required: true
+        description: 'Password for n8n basic auth (overrides input n8n_basic_auth_password)'
+        required: false
       N8N_DOMAIN:
         description: 'Domain for n8n installation'
         required: true
@@ -81,7 +86,7 @@ jobs:
 
       - name: Run CI
         env:
-          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD || inputs.n8n_basic_auth_password }}
           N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
           N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
         run: |
@@ -131,7 +136,7 @@ jobs:
       - name: Deploy to DigitalOcean
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD || inputs.n8n_basic_auth_password }}
           N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
           N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
         run: |
