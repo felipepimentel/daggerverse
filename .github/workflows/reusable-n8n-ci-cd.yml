@@ -27,6 +27,11 @@ on:
         description: 'Repository containing the n8n configuration'
         required: true
         type: string
+      workdir:
+        description: 'Working directory containing the Dagger pipeline'
+        required: false
+        type: string
+        default: 'pipelines/n8n-digitalocean'
     secrets:
       digitalocean_token:
         description: 'DigitalOcean API token'
@@ -72,7 +77,7 @@ jobs:
 
       - name: Run CI
         run: |
-          cd pipelines/n8n-digitalocean
+          cd ${{ inputs.workdir }}
           dagger call ci \
             --n8n-repo "../n8n-repo"
 
@@ -119,7 +124,7 @@ jobs:
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.digitalocean_token }}
         run: |
-          cd pipelines/n8n-digitalocean
+          cd ${{ inputs.workdir }}
           dagger call deploy \
             --token "$DIGITALOCEAN_TOKEN" \
             --region "${{ inputs.region }}" \
