@@ -36,6 +36,9 @@ on:
       digitalocean_token:
         description: 'DigitalOcean API token'
         required: true
+      ssh_private_key:
+        description: 'SSH private key for DigitalOcean access'
+        required: true
 
 jobs:
   ci:
@@ -54,6 +57,18 @@ jobs:
           repository: ${{ inputs.repository }}
           path: n8n-repo
           fetch-depth: 0
+
+      - name: Setup SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.ssh_private_key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H registry.digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
@@ -100,6 +115,18 @@ jobs:
           path: n8n-repo
           fetch-depth: 0
 
+      - name: Setup SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.ssh_private_key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H registry.digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
         with:
@@ -123,6 +150,7 @@ jobs:
       - name: Deploy to DigitalOcean
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.digitalocean_token }}
+          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
         run: |
           cd ${{ inputs.workdir }}
           dagger call deploy \
@@ -130,7 +158,8 @@ jobs:
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
             --env-vars '${{ inputs.env_vars }}' \
-            --n8n-repo "../../n8n-repo"
+            --n8n-repo "../../n8n-repo" \
+            --ssh-key "$SSH_PRIVATE_KEY"
 
       - name: Configure Git
         working-directory: n8n-repo
