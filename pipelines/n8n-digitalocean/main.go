@@ -7,6 +7,7 @@ import (
 
 	do "github.com/felipepimentel/daggerverse/libraries/digitalocean"
 	docker "github.com/felipepimentel/daggerverse/libraries/docker"
+	sshmanager "github.com/felipepimentel/daggerverse/libraries/ssh-manager"
 	n8n "github.com/felipepimentel/daggerverse/pipelines/n8n"
 
 	"dagger.io/dagger"
@@ -20,6 +21,8 @@ type N8NDigitalOcean struct {
 	DigitalOcean *do.Digitalocean
 	// Docker configuration for building and pushing images
 	Docker *docker.Docker
+	// SSH Manager for key management
+	SSHManager *sshmanager.SSHManager
 	// Application configuration
 	AppName      string
 	Region       string
@@ -40,6 +43,22 @@ func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error)
 	if n.Docker == nil {
 		return nil, fmt.Errorf("docker configuration is required")
 	}
+	if n.SSHManager == nil {
+		return nil, fmt.Errorf("ssh manager is required")
+	}
+
+	// Generate ephemeral SSH key
+	key, err := n.SSHManager.GenerateKey(ctx, fmt.Sprintf("n8n-%s", n.AppName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SSH key: %w", err)
+	}
+
+	// Clean up the key after deployment
+	defer func() {
+		if err := n.SSHManager.DeleteKey(ctx, key.Fingerprint); err != nil {
+			fmt.Printf("Warning: failed to delete SSH key: %v\n", err)
+		}
+	}()
 
 	// Build and publish n8n container
 	container, err := n.N8N.CD(ctx)
