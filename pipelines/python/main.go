@@ -71,6 +71,10 @@ type Python struct {
 	dockerUsername string
 	// dockerPassword is used for Docker Hub authentication.
 	dockerPassword *dagger.Secret
+	// skipTests indicates whether to skip running tests
+	skipTests bool
+	// skipLint indicates whether to skip running linting checks
+	skipLint bool
 }
 
 // New creates a new instance of Python with the provided configuration.
@@ -93,6 +97,14 @@ func New(
 	// Docker Hub password
 	// +optional
 	dockerPassword *dagger.Secret,
+	// Skip running tests
+	// +optional
+	// +default=false
+	skipTests bool,
+	// Skip running linting checks
+	// +optional
+	// +default=false
+	skipLint bool,
 ) *Python {
 	if pythonVersion == "" {
 		pythonVersion = DefaultPythonVersion
@@ -110,6 +122,8 @@ func New(
 		gitName:         gitName,
 		dockerUsername:  dockerUsername,
 		dockerPassword:  dockerPassword,
+		skipTests:       skipTests,
+		skipLint:        skipLint,
 	}
 }
 
@@ -118,9 +132,11 @@ func New(
 func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
 	fmt.Println(logStartPublish)
 
-	// Run tests first
-	if _, err := p.Test(ctx, source); err != nil {
-		return "", fmt.Errorf("tests failed: %w", err)
+	// Run tests first if not skipped
+	if !p.skipTests {
+		if _, err := p.Test(ctx, source); err != nil {
+			return "", fmt.Errorf("tests failed: %w", err)
+		}
 	}
 
 	// Get version from versioner module
@@ -164,19 +180,24 @@ func (p *Python) Build(ctx context.Context, source *dagger.Directory) *dagger.Co
 // Test runs all quality checks and returns the combined test output.
 // It returns an error if any check fails.
 func (p *Python) Test(ctx context.Context, source *dagger.Directory) (string, error) {
-	fmt.Println(logStartTests)
+	var testOutput string
+	var err error
 
-	// Run tests using Poetry module
-	testOutput, err := dag.Poetry().Test(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", errPoetryTest, err)
+	if !p.skipTests {
+		fmt.Println(logStartTests)
+		// Run tests using Poetry module
+		testOutput, err = dag.Poetry().Test(ctx, source)
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", errPoetryTest, err)
+		}
+		fmt.Println(logSuccessTests)
 	}
 
-	fmt.Println(logSuccessTests)
-
-	// Run linting checks
-	if err := p.Lint(ctx, source); err != nil {
-		return "", err
+	// Run linting checks if not skipped
+	if !p.skipLint {
+		if err := p.Lint(ctx, source); err != nil {
+			return "", err
+		}
 	}
 
 	return fmt.Sprintf("Test output:\n%s", testOutput), nil
