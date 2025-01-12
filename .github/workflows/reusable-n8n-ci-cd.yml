@@ -9,7 +9,7 @@ on:
         type: string
         default: '0.15.1'
       source_path:
-        description: 'Path to n8n configuration repository'
+        description: 'Path to n8n configuration files'
         required: false
         type: string
         default: '.'
@@ -23,10 +23,6 @@ on:
         required: false
         type: string
         default: 'n8n'
-      repository:
-        description: 'Repository containing the n8n configuration'
-        required: true
-        type: string
       deploy:
         description: 'Whether to deploy to DigitalOcean'
         required: false
@@ -74,13 +70,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Checkout n8n Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.repository }}
-          path: n8n-repo
-          fetch-depth: 0
-
       - name: Setup Dagger
         uses: dagger/dagger-for-github@v7
         with:
@@ -99,7 +88,6 @@ jobs:
           dagger call \
             ${{ inputs.deploy && 'deploy' || 'ci' }} \
             --source ${{ inputs.source_path }} \
-            --n8n-repo "./n8n-repo" \
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
             --token "env:DIGITALOCEAN_TOKEN" \
