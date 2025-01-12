@@ -23,6 +23,10 @@ on:
         required: false
         type: string
         default: '{"N8N_BASIC_AUTH_ACTIVE": "true", "N8N_BASIC_AUTH_USER": "admin"}'
+      repository:
+        description: 'Repository containing the n8n configuration'
+        required: true
+        type: string
     secrets:
       digitalocean_token:
         description: 'DigitalOcean API token'
@@ -33,20 +37,19 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Daggerverse
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Debug Directory Structure
-        run: |
-          echo "Current working directory: $PWD"
-          echo "Repository contents:"
-          ls -la
-          echo "Pipelines directory contents:"
-          ls -la pipelines/
-          
+      - name: Checkout n8n Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          path: n8n-repo
+          fetch-depth: 0
+
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
         with:
@@ -67,17 +70,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dagger-
 
-      - name: Verify Directory Structure
-        run: |
-          pwd
-          ls -la
-          echo "Current directory structure:"
-          tree -L 2 || true
-
       - name: Run CI
         run: |
           cd pipelines/n8n-digitalocean
-          dagger call ci
+          dagger call ci \
+            --n8n-repo "../n8n-repo"
 
   cd:
     name: CD
@@ -85,9 +82,17 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Daggerverse
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Checkout n8n Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          path: n8n-repo
           fetch-depth: 0
 
       - name: Set up Docker
@@ -119,14 +124,17 @@ jobs:
             --token "$DIGITALOCEAN_TOKEN" \
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
-            --env-vars '${{ inputs.env_vars }}'
+            --env-vars '${{ inputs.env_vars }}' \
+            --n8n-repo "../n8n-repo"
 
       - name: Configure Git
+        working-directory: n8n-repo
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
       - name: Sync Repository
+        working-directory: n8n-repo
         run: |
           git pull origin main
           git add .
