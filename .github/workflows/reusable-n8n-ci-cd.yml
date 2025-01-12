@@ -18,11 +18,6 @@ on:
         required: false
         type: string
         default: 'n8n'
-      env_vars:
-        description: 'Environment variables for n8n'
-        required: false
-        type: string
-        default: '{"N8N_BASIC_AUTH_ACTIVE": "true", "N8N_BASIC_AUTH_USER": "admin"}'
       repository:
         description: 'Repository containing the n8n configuration'
         required: true
@@ -33,11 +28,26 @@ on:
         type: string
         default: 'pipelines/n8n-digitalocean'
     secrets:
-      digitalocean_token:
+      DIGITALOCEAN_ACCESS_TOKEN:
         description: 'DigitalOcean API token'
         required: true
-      ssh_private_key:
+      DO_SSH_KEY_FINGERPRINT:
+        description: 'SSH key fingerprint registered in DigitalOcean'
+        required: true
+      DO_SSH_KEY_ID:
+        description: 'SSH key ID registered in DigitalOcean'
+        required: true
+      DO_SSH_PRIVATE_KEY:
         description: 'SSH private key for DigitalOcean access'
+        required: true
+      N8N_BASIC_AUTH_PASSWORD:
+        description: 'Password for n8n basic auth'
+        required: true
+      N8N_DOMAIN:
+        description: 'Domain for n8n installation'
+        required: true
+      N8N_ENCRYPTION_KEY:
+        description: 'Encryption key for n8n'
         required: true
 
 jobs:
@@ -63,7 +73,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${{ secrets.ssh_private_key }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
           ssh-keyscan -H registry.digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -91,6 +101,10 @@ jobs:
             ${{ runner.os }}-dagger-
 
       - name: Run CI
+        env:
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
+          N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
         run: |
           cd ${{ inputs.workdir }}
           dagger call ci \
@@ -120,7 +134,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${{ secrets.ssh_private_key }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
           ssh-keyscan -H registry.digitalocean.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -149,17 +163,26 @@ jobs:
 
       - name: Deploy to DigitalOcean
         env:
-          DIGITALOCEAN_TOKEN: ${{ secrets.digitalocean_token }}
-          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          SSH_KEY_FINGERPRINT: ${{ secrets.DO_SSH_KEY_FINGERPRINT }}
+          SSH_KEY_ID: ${{ secrets.DO_SSH_KEY_ID }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
+          N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
         run: |
           cd ${{ inputs.workdir }}
           dagger call deploy \
             --token "$DIGITALOCEAN_TOKEN" \
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
-            --env-vars '${{ inputs.env_vars }}' \
-            --n8n-repo "../../n8n-repo" \
-            --ssh-key "$SSH_PRIVATE_KEY"
+            --ssh-key "$SSH_PRIVATE_KEY" \
+            --ssh-key-fingerprint "$SSH_KEY_FINGERPRINT" \
+            --ssh-key-id "$SSH_KEY_ID" \
+            --domain "$N8N_DOMAIN" \
+            --basic-auth-password "$N8N_BASIC_AUTH_PASSWORD" \
+            --encryption-key "$N8N_ENCRYPTION_KEY" \
+            --n8n-repo "../../n8n-repo"
 
       - name: Configure Git
         working-directory: n8n-repo
