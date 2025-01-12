@@ -70,13 +70,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup Dagger
-        uses: dagger/dagger-for-github@v7
-        with:
-          version: ${{ inputs.dagger_version }}
-
       - name: Run n8n Pipeline
+        uses: dagger/dagger-for-github@v7
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           DO_SSH_KEY_FINGERPRINT: ${{ secrets.DO_SSH_KEY_FINGERPRINT }}
           DO_SSH_KEY_ID: ${{ secrets.DO_SSH_KEY_ID }}
@@ -84,16 +81,19 @@ jobs:
           N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
           N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
           N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
-        run: |
-          dagger call \
-            ${{ inputs.deploy && 'deploy' || 'ci' }} \
-            --source ${{ inputs.source_path }} \
-            --region "${{ inputs.region }}" \
-            --app-name "${{ inputs.app_name }}" \
-            --token "env:DIGITALOCEAN_TOKEN" \
-            --domain "env:N8N_DOMAIN" \
-            --basic-auth-password "env:N8N_BASIC_AUTH_PASSWORD" \
-            --encryption-key "env:N8N_ENCRYPTION_KEY" \
-            --ssh-key "env:DO_SSH_PRIVATE_KEY" \
-            --ssh-key-fingerprint "env:DO_SSH_KEY_FINGERPRINT" \
-            --ssh-key-id "env:DO_SSH_KEY_ID" 
+        with:
+          verb: call
+          module: github.com/felipepimentel/daggerverse/pipelines/n8n-digitalocean@main
+          args: >-
+            ${{ inputs.deploy && 'deploy' || 'ci' }}
+            --source ${{ inputs.source_path }}
+            --region "${{ inputs.region }}"
+            --app-name "${{ inputs.app_name }}"
+            --token "env:DIGITALOCEAN_TOKEN"
+            --domain "env:N8N_DOMAIN"
+            --basic-auth-password "env:N8N_BASIC_AUTH_PASSWORD"
+            --encryption-key "env:N8N_ENCRYPTION_KEY"
+            --ssh-key "env:DO_SSH_PRIVATE_KEY"
+            --ssh-key-fingerprint "env:DO_SSH_KEY_FINGERPRINT"
+            --ssh-key-id "env:DO_SSH_KEY_ID"
+          version: ${{ inputs.dagger_version }} 
