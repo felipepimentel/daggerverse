@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/libraries/digitalocean
+module dagger/digitalocean
 
 go 1.22.7
 

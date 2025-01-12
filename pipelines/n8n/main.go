@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/felipepimentel/daggerverse/pipelines/n8n/internal/dagger"
+	"dagger/n8n/internal/dagger"
 )
 
 // N8N provides methods for building and deploying n8n

@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/libraries/docker
+module dagger/docker
 
 go 1.22.7
 

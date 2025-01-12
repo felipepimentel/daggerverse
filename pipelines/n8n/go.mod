@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/pipelines/n8n
+module dagger/n8n
 
 go 1.22.7
 
@@ -44,7 +44,9 @@ require (
 	google.golang.org/protobuf v1.36.1 // indirect
 )
 
-replace github.com/felipepimentel/daggerverse/libraries/digitalocean => ../../libraries/digitalocean
+replace dagger/digitalocean => ../../libraries/digitalocean
+
+replace dagger/docker => ../../libraries/docker
 
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88
 

@@ -5,94 +5,132 @@ import (
 	"context"
 	"fmt"
 
-	do "github.com/felipepimentel/daggerverse/libraries/digitalocean"
-	docker "github.com/felipepimentel/daggerverse/libraries/docker"
-	sshmanager "github.com/felipepimentel/daggerverse/libraries/ssh-manager"
-	n8n "github.com/felipepimentel/daggerverse/pipelines/n8n"
-
-	"dagger.io/dagger"
+	"dagger/n8n-digitalocean/internal/dagger"
 )
 
 // N8NDigitalOcean represents the n8n deployment pipeline for DigitalOcean
 type N8NDigitalOcean struct {
-	// N8N pipeline configuration
-	N8N *n8n.N8N
+	// Source directory containing n8n configuration
+	Source *dagger.Directory
+	// Environment variables for n8n
+	EnvVars []EnvVar
+	// Port to expose n8n on
+	Port int
+	// Registry to publish to
+	Registry string
+	// Image tag
+	Tag string
+	// Registry auth token
+	RegistryAuth *dagger.Secret
 	// DigitalOcean configuration
-	DigitalOcean *do.Digitalocean
-	// Docker configuration for building and pushing images
-	Docker *docker.Docker
-	// SSH Manager for key management
-	SSHManager *sshmanager.SSHManager
-	// Application configuration
-	AppName      string
+	DOConfig *DOConfig
+}
+
+// EnvVar represents an environment variable
+type EnvVar struct {
+	Name  string
+	Value string
+}
+
+// DOConfig represents DigitalOcean-specific configuration
+type DOConfig struct {
+	Token        *dagger.Secret
 	Region       string
+	AppName      string
 	InstanceSize string
-	DatabaseURL  string
-	WebhookURL   string
-	EncKey       string
 }
 
 // Deploy builds and deploys n8n to DigitalOcean
 func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error) {
-	if n.N8N == nil {
-		return nil, fmt.Errorf("n8n configuration is required")
+	if n.Source == nil {
+		return nil, fmt.Errorf("source directory is required")
 	}
-	if n.DigitalOcean == nil {
+	if n.DOConfig == nil {
 		return nil, fmt.Errorf("digitalocean configuration is required")
 	}
-	if n.Docker == nil {
-		return nil, fmt.Errorf("docker configuration is required")
-	}
-	if n.SSHManager == nil {
-		return nil, fmt.Errorf("ssh manager is required")
+	if n.DOConfig.Token == nil {
+		return nil, fmt.Errorf("digitalocean token is required")
 	}
 
-	// Generate ephemeral SSH key
-	key, err := n.SSHManager.GenerateKey(ctx, fmt.Sprintf("n8n-%s", n.AppName))
+	// Build n8n container
+	container := dag.Container().
+		From("node:18-alpine").
+		WithMountedDirectory("/app", n.Source).
+		WithWorkdir("/app").
+		WithExec([]string{"npm", "install", "-g", "n8n"})
+
+	// Set environment variables
+	for _, env := range n.EnvVars {
+		container = container.WithEnvVariable(env.Name, env.Value)
+	}
+
+	// Set default port if not specified
+	if n.Port == 0 {
+		n.Port = 5678
+	}
+
+	container = container.
+		WithExposedPort(n.Port).
+		WithEntrypoint([]string{"n8n", "start"})
+
+	// Add registry auth if provided
+	if n.RegistryAuth != nil {
+		container = container.WithRegistryAuth(n.Registry, "", n.RegistryAuth)
+	}
+
+	// Publish the container
+	_, err := container.Publish(ctx, fmt.Sprintf("%s:%s", n.Registry, n.Tag))
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate SSH key: %w", err)
+		return nil, fmt.Errorf("failed to publish container: %w", err)
 	}
 
-	// Clean up the key after deployment
-	defer func() {
-		if err := n.SSHManager.DeleteKey(ctx, key.Fingerprint); err != nil {
-			fmt.Printf("Warning: failed to delete SSH key: %v\n", err)
-		}
-	}()
+	// Create app spec
+	appSpec := fmt.Sprintf(`{
+		"name": "%s",
+		"region": "%s",
+		"services": [{
+			"name": "%s",
+			"instance_size_slug": "%s",
+			"instance_count": 1,
+			"image": {
+				"registry_type": "DOCR",
+				"repository": "%s",
+				"tag": "%s"
+			},
+			"health_check": {
+				"http_path": "/healthz"
+			}
+		}]
+	}`, n.DOConfig.AppName, n.DOConfig.Region, n.DOConfig.AppName, n.DOConfig.InstanceSize, n.Registry, n.Tag)
 
-	// Build and publish n8n container
-	container, err := n.N8N.CD(ctx)
+	// Get token value
+	token, err := n.DOConfig.Token.Plaintext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build and publish n8n: %w", err)
+		return nil, fmt.Errorf("failed to get token: %w", err)
 	}
 
-	// Configure n8n app deployment
-	appConfig := do.N8NAppConfig{
-		AppConfig: do.AppConfig{
-			Name:         n.AppName,
-			Region:       n.Region,
-			InstanceSize: n.InstanceSize,
-			Container:    container,
-		},
-		DatabaseURL: n.DatabaseURL,
-		WebhookURL:  n.WebhookURL,
-		EncKey:      n.EncKey,
-	}
-
-	// Deploy to DigitalOcean
-	deployedApp, err := n.DigitalOcean.DeployN8N(ctx, appConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy n8n to DigitalOcean: %w", err)
-	}
-
-	return deployedApp, nil
+	// Create a new container with doctl
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
+		WithExec([]string{"apps", "create", "--spec", appSpec}), nil
 }
 
 // GetStatus returns the deployment status and URL of the n8n app
-func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (string, string, error) {
-	if n.DigitalOcean == nil {
-		return "", "", fmt.Errorf("digitalocean configuration is required")
+func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (*dagger.Container, error) {
+	if n.DOConfig == nil || n.DOConfig.Token == nil {
+		return nil, fmt.Errorf("digitalocean configuration is required")
 	}
 
-	return n.DigitalOcean.GetN8NAppStatus(ctx, appID)
+	// Get token value
+	token, err := n.DOConfig.Token.Plaintext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token: %w", err)
+	}
+
+	// Get app status
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
+		WithExec([]string{"apps", "get", appID, "--format", "json"}), nil
 }

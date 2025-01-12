@@ -5,8 +5,9 @@ import (
 	"context"
 	"fmt"
 
+	"dagger/digitalocean/internal/dagger"
+
 	"github.com/digitalocean/godo"
-	"github.com/felipepimentel/daggerverse/libraries/digitalocean/internal/dagger"
 	"golang.org/x/oauth2"
 )
 

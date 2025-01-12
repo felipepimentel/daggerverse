@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/felipepimentel/daggerverse/libraries/docker/internal/dagger"
+	"dagger/docker/internal/dagger"
 )
 
 var (
