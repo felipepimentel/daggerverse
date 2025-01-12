@@ -1,0 +1,5 @@
+{
+  "name": "ssh-manager",
+  "sdk": "go",
+  "dependencies": []
+} 
