@@ -31,7 +31,7 @@ on:
         description: 'Working directory containing the Dagger pipeline'
         required: false
         type: string
-        default: 'pipelines/n8n-digitalocean'
+        default: '.'
     secrets:
       digitalocean_token:
         description: 'DigitalOcean API token'
