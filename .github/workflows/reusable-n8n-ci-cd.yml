@@ -53,7 +53,7 @@ jobs:
 
       - name: Run CI
         run: |
-          dagger call ci --source .
+          dagger call ci --source ./pipelines/n8n-digitalocean
 
   cd:
     name: CD
