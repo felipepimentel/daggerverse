@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: '0.15.1'
+      source_path:
+        description: 'Path to n8n configuration repository'
+        required: false
+        type: string
+        default: '.'
       region:
         description: 'DigitalOcean region'
         required: false
@@ -22,24 +27,11 @@ on:
         description: 'Repository containing the n8n configuration'
         required: true
         type: string
-      workdir:
-        description: 'Working directory containing the Dagger pipeline. Points to the n8n-digitalocean module in daggerverse.'
+      deploy:
+        description: 'Whether to deploy to DigitalOcean'
         required: false
-        type: string
-        default: 'pipelines/n8n-digitalocean'
-      n8n_basic_auth_password:
-        description: 'Password for n8n basic auth'
-        required: false
-        type: string
-        default: 'n8n-admin-password'
-      n8n_domain:
-        description: 'Domain for n8n installation'
-        required: false
-        type: string
-      n8n_encryption_key:
-        description: 'Encryption key for n8n'
-        required: false
-        type: string
+        type: boolean
+        default: false
     secrets:
       DIGITALOCEAN_ACCESS_TOKEN:
         description: 'DigitalOcean API token'
@@ -54,57 +46,26 @@ on:
         description: 'SSH private key for DigitalOcean access'
         required: true
       N8N_BASIC_AUTH_PASSWORD:
-        description: 'Password for n8n basic auth (overrides input n8n_basic_auth_password)'
+        description: 'Password for n8n basic auth'
         required: false
       N8N_DOMAIN:
-        description: 'Domain for n8n installation (overrides input n8n_domain)'
-        required: false
+        description: 'Domain for n8n installation'
+        required: true
       N8N_ENCRYPTION_KEY:
-        description: 'Encryption key for n8n (overrides input n8n_encryption_key)'
+        description: 'Encryption key for n8n'
         required: false
+
+permissions:
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+  packages: write
+  statuses: write
+  actions: read
 
 jobs:
-  validate:
-    name: Validate Inputs
-    runs-on: ubuntu-latest
-    outputs:
-      auth_password: ${{ steps.validate.outputs.auth_password }}
-      domain: ${{ steps.validate.outputs.domain }}
-      encryption_key: ${{ steps.validate.outputs.encryption_key }}
-    steps:
-      - name: Validate and Set Outputs
-        id: validate
-        run: |
-          # Set auth password
-          if [ -n "${{ secrets.N8N_BASIC_AUTH_PASSWORD }}" ]; then
-            echo "auth_password=${{ secrets.N8N_BASIC_AUTH_PASSWORD }}" >> $GITHUB_OUTPUT
-          else
-            echo "auth_password=${{ inputs.n8n_basic_auth_password }}" >> $GITHUB_OUTPUT
-          fi
-
-          # Set domain
-          if [ -n "${{ secrets.N8N_DOMAIN }}" ]; then
-            echo "domain=${{ secrets.N8N_DOMAIN }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ inputs.n8n_domain }}" ]; then
-            echo "domain=${{ inputs.n8n_domain }}" >> $GITHUB_OUTPUT
-          else
-            echo "Error: n8n_domain is required either as input or secret"
-            exit 1
-          fi
-
-          # Set encryption key
-          if [ -n "${{ secrets.N8N_ENCRYPTION_KEY }}" ]; then
-            echo "encryption_key=${{ secrets.N8N_ENCRYPTION_KEY }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ inputs.n8n_encryption_key }}" ]; then
-            echo "encryption_key=${{ inputs.n8n_encryption_key }}" >> $GITHUB_OUTPUT
-          else
-            # Generate random encryption key if not provided
-            echo "encryption_key=$(openssl rand -hex 24)" >> $GITHUB_OUTPUT
-          fi
-
-  ci:
-    name: CI
-    needs: validate
+  pipeline:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Daggerverse
@@ -120,108 +81,31 @@ jobs:
           path: n8n-repo
           fetch-depth: 0
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
-          driver-opts: |
-            image=moby/buildkit:latest
-
       - name: Setup Dagger
         uses: dagger/dagger-for-github@v7
         with:
           version: ${{ inputs.dagger_version }}
-          
-      - name: Cache Dagger
-        uses: actions/cache@v3
-        with:
-          path: ~/.dagger
-          key: ${{ runner.os }}-dagger-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-dagger-
 
-      - name: Run CI
-        env:
-          N8N_BASIC_AUTH_PASSWORD: ${{ needs.validate.outputs.auth_password }}
-          N8N_DOMAIN: ${{ needs.validate.outputs.domain }}
-          N8N_ENCRYPTION_KEY: ${{ needs.validate.outputs.encryption_key }}
-        run: |
-          cd ${{ inputs.workdir }}
-          dagger call ci \
-            --n8n-repo "../../n8n-repo"
-
-  cd:
-    name: CD
-    needs: [validate, ci]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Daggerverse
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Checkout n8n Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.repository }}
-          path: n8n-repo
-          fetch-depth: 0
-
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
-          driver-opts: |
-            image=moby/buildkit:latest
-
-      - name: Setup Dagger
-        uses: dagger/dagger-for-github@v7
-        with:
-          version: ${{ inputs.dagger_version }}
-          
-      - name: Cache Dagger
-        uses: actions/cache@v3
-        with:
-          path: ~/.dagger
-          key: ${{ runner.os }}-dagger-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-dagger-
-
-      - name: Deploy to DigitalOcean
+      - name: Run n8n Pipeline
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           DO_SSH_KEY_FINGERPRINT: ${{ secrets.DO_SSH_KEY_FINGERPRINT }}
           DO_SSH_KEY_ID: ${{ secrets.DO_SSH_KEY_ID }}
           DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
-          N8N_BASIC_AUTH_PASSWORD: ${{ needs.validate.outputs.auth_password }}
-          N8N_DOMAIN: ${{ needs.validate.outputs.domain }}
-          N8N_ENCRYPTION_KEY: ${{ needs.validate.outputs.encryption_key }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+          N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
+          N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
         run: |
-          cd ${{ inputs.workdir }}
-          dagger call deploy \
-            --token "$DIGITALOCEAN_TOKEN" \
+          dagger call \
+            ${{ inputs.deploy && 'deploy' || 'ci' }} \
+            --source ${{ inputs.source_path }} \
+            --n8n-repo "./n8n-repo" \
             --region "${{ inputs.region }}" \
             --app-name "${{ inputs.app_name }}" \
-            --domain "$N8N_DOMAIN" \
-            --basic-auth-password "$N8N_BASIC_AUTH_PASSWORD" \
-            --encryption-key "$N8N_ENCRYPTION_KEY" \
-            --ssh-key "$DO_SSH_PRIVATE_KEY" \
-            --ssh-key-fingerprint "$DO_SSH_KEY_FINGERPRINT" \
-            --ssh-key-id "$DO_SSH_KEY_ID" \
-            --n8n-repo "../../n8n-repo"
-
-      - name: Configure Git
-        working-directory: n8n-repo
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
-      - name: Sync Repository
-        working-directory: n8n-repo
-        run: |
-          git pull origin main
-          git add .
-          git commit -m "chore(release): sync repository after deployment [skip ci]" || echo "No changes to commit"
-          git push origin main 
+            --token "env:DIGITALOCEAN_TOKEN" \
+            --domain "env:N8N_DOMAIN" \
+            --basic-auth-password "env:N8N_BASIC_AUTH_PASSWORD" \
+            --encryption-key "env:N8N_ENCRYPTION_KEY" \
+            --ssh-key "env:DO_SSH_PRIVATE_KEY" \
+            --ssh-key-fingerprint "env:DO_SSH_KEY_FINGERPRINT" \
+            --ssh-key-id "env:DO_SSH_KEY_ID" 
