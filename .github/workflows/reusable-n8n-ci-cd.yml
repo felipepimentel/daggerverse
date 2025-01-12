@@ -32,23 +32,79 @@ on:
         required: false
         type: string
         default: 'n8n-admin-password'
+      n8n_domain:
+        description: 'Domain for n8n installation'
+        required: false
+        type: string
+      n8n_encryption_key:
+        description: 'Encryption key for n8n'
+        required: false
+        type: string
     secrets:
       DIGITALOCEAN_ACCESS_TOKEN:
         description: 'DigitalOcean API token'
+        required: true
+      DO_SSH_KEY_FINGERPRINT:
+        description: 'SSH key fingerprint registered in DigitalOcean'
+        required: true
+      DO_SSH_KEY_ID:
+        description: 'SSH key ID registered in DigitalOcean'
+        required: true
+      DO_SSH_PRIVATE_KEY:
+        description: 'SSH private key for DigitalOcean access'
         required: true
       N8N_BASIC_AUTH_PASSWORD:
         description: 'Password for n8n basic auth (overrides input n8n_basic_auth_password)'
         required: false
       N8N_DOMAIN:
-        description: 'Domain for n8n installation'
-        required: true
+        description: 'Domain for n8n installation (overrides input n8n_domain)'
+        required: false
       N8N_ENCRYPTION_KEY:
-        description: 'Encryption key for n8n'
-        required: true
+        description: 'Encryption key for n8n (overrides input n8n_encryption_key)'
+        required: false
 
 jobs:
+  validate:
+    name: Validate Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      auth_password: ${{ steps.validate.outputs.auth_password }}
+      domain: ${{ steps.validate.outputs.domain }}
+      encryption_key: ${{ steps.validate.outputs.encryption_key }}
+    steps:
+      - name: Validate and Set Outputs
+        id: validate
+        run: |
+          # Set auth password
+          if [ -n "${{ secrets.N8N_BASIC_AUTH_PASSWORD }}" ]; then
+            echo "auth_password=${{ secrets.N8N_BASIC_AUTH_PASSWORD }}" >> $GITHUB_OUTPUT
+          else
+            echo "auth_password=${{ inputs.n8n_basic_auth_password }}" >> $GITHUB_OUTPUT
+          fi
+
+          # Set domain
+          if [ -n "${{ secrets.N8N_DOMAIN }}" ]; then
+            echo "domain=${{ secrets.N8N_DOMAIN }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.n8n_domain }}" ]; then
+            echo "domain=${{ inputs.n8n_domain }}" >> $GITHUB_OUTPUT
+          else
+            echo "Error: n8n_domain is required either as input or secret"
+            exit 1
+          fi
+
+          # Set encryption key
+          if [ -n "${{ secrets.N8N_ENCRYPTION_KEY }}" ]; then
+            echo "encryption_key=${{ secrets.N8N_ENCRYPTION_KEY }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.n8n_encryption_key }}" ]; then
+            echo "encryption_key=${{ inputs.n8n_encryption_key }}" >> $GITHUB_OUTPUT
+          else
+            # Generate random encryption key if not provided
+            echo "encryption_key=$(openssl rand -hex 24)" >> $GITHUB_OUTPUT
+          fi
+
   ci:
     name: CI
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Daggerverse
@@ -86,9 +142,9 @@ jobs:
 
       - name: Run CI
         env:
-          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD || inputs.n8n_basic_auth_password }}
-          N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
-          N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ needs.validate.outputs.auth_password }}
+          N8N_DOMAIN: ${{ needs.validate.outputs.domain }}
+          N8N_ENCRYPTION_KEY: ${{ needs.validate.outputs.encryption_key }}
         run: |
           cd ${{ inputs.workdir }}
           dagger call ci \
@@ -96,7 +152,7 @@ jobs:
 
   cd:
     name: CD
-    needs: ci
+    needs: [validate, ci]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -136,9 +192,12 @@ jobs:
       - name: Deploy to DigitalOcean
         env:
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD || inputs.n8n_basic_auth_password }}
-          N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
-          N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }}
+          DO_SSH_KEY_FINGERPRINT: ${{ secrets.DO_SSH_KEY_FINGERPRINT }}
+          DO_SSH_KEY_ID: ${{ secrets.DO_SSH_KEY_ID }}
+          DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          N8N_BASIC_AUTH_PASSWORD: ${{ needs.validate.outputs.auth_password }}
+          N8N_DOMAIN: ${{ needs.validate.outputs.domain }}
+          N8N_ENCRYPTION_KEY: ${{ needs.validate.outputs.encryption_key }}
         run: |
           cd ${{ inputs.workdir }}
           dagger call deploy \
@@ -148,6 +207,9 @@ jobs:
             --domain "$N8N_DOMAIN" \
             --basic-auth-password "$N8N_BASIC_AUTH_PASSWORD" \
             --encryption-key "$N8N_ENCRYPTION_KEY" \
+            --ssh-key "$DO_SSH_PRIVATE_KEY" \
+            --ssh-key-fingerprint "$DO_SSH_KEY_FINGERPRINT" \
+            --ssh-key-id "$DO_SSH_KEY_ID" \
             --n8n-repo "../../n8n-repo"
 
       - name: Configure Git
