@@ -10,8 +10,8 @@ import (
 
 var client *dagger.Client
 
-// N8NDigitalOcean represents the n8n deployment pipeline for DigitalOcean
-type N8NDigitalOcean struct {
+// N8nDigitalocean represents the n8n deployment pipeline for DigitalOcean
+type N8nDigitalocean struct {
 	// Source directory containing n8n configuration
 	Source *dagger.Directory
 	// Environment variables for n8n
@@ -29,9 +29,9 @@ type N8NDigitalOcean struct {
 }
 
 // New creates a new instance of the n8n-digitalocean module
-func New(c *dagger.Client) *N8NDigitalOcean {
+func New(c *dagger.Client) *N8nDigitalocean {
 	client = c
-	return &N8NDigitalOcean{}
+	return &N8nDigitalocean{}
 }
 
 // EnvVar represents an environment variable
@@ -54,7 +54,7 @@ type CaddyConfig struct {
 }
 
 // generateCaddyfile creates a Caddyfile configuration
-func (n *N8NDigitalOcean) generateCaddyfile(domain string) string {
+func (n *N8nDigitalocean) generateCaddyfile(domain string) string {
 	return fmt.Sprintf(`%s {
     reverse_proxy n8n:5678 {
         flush_interval -1
@@ -63,7 +63,7 @@ func (n *N8NDigitalOcean) generateCaddyfile(domain string) string {
 }
 
 // Deploy builds and deploys n8n to DigitalOcean
-func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error) {
+func (n *N8nDigitalocean) Deploy(ctx context.Context) (*dagger.Container, error) {
 	if n.Source == nil {
 		return nil, fmt.Errorf("source directory is required")
 	}
@@ -174,7 +174,7 @@ func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error)
 }
 
 // GetStatus returns the deployment status and URL of the n8n app
-func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (*dagger.Container, error) {
+func (n *N8nDigitalocean) GetStatus(ctx context.Context, appID string) (*dagger.Container, error) {
 	if n.DOConfig == nil || n.DOConfig.Token == nil {
 		return nil, fmt.Errorf("digitalocean configuration is required")
 	}
@@ -193,7 +193,7 @@ func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (*dagger.
 }
 
 // CI runs the CI pipeline for n8n
-func (n *N8NDigitalOcean) CI(ctx context.Context, source *dagger.Directory, region string, appName string, token *dagger.Secret, domain string, basicAuthPassword string, encryptionKey string, sshKey *dagger.Secret, sshKeyFingerprint string, sshKeyID string) (*dagger.Container, error) {
+func (n *N8nDigitalocean) CI(ctx context.Context, source *dagger.Directory, region string, appName string, token *dagger.Secret, domain string, basicAuthPassword string, encryptionKey string, sshKey *dagger.Secret, sshKeyFingerprint string, sshKeyID string) (*dagger.Container, error) {
 	n.Source = source
 	n.Registry = "registry.digitalocean.com/pimentel/n8n"
 	n.Tag = "latest"
