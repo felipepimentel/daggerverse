@@ -148,8 +148,8 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	fmt.Printf(logSuccessVersion+"\n", version)
 
 	fmt.Println(logStartBuild)
-	// Build package using Poetry module
-	buildDir := dag.Poetry().Build(source)
+	// Build package using Poetry module with the new version
+	buildDir := dag.Poetry().BuildWithVersion(source, version)
 
 	fmt.Println(logStartPyPI)
 	// Publish to PyPI using the pypi module

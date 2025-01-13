@@ -59,6 +59,17 @@ func (m *Poetry) Build(source *dagger.Directory) *dagger.Directory {
 	return container.Directory("/src/dist")
 }
 
+// BuildWithVersion builds the Python package using Poetry with a specific version.
+func (m *Poetry) BuildWithVersion(source *dagger.Directory, version string) *dagger.Directory {
+	container := m.getBaseContainer(source).
+		WithExec([]string{"poetry", "config", "virtualenvs.create", "false"}).
+		WithExec([]string{"poetry", "version", version}).
+		WithExec([]string{"poetry", "install", "--no-interaction"}).
+		WithExec([]string{"poetry", "build"})
+
+	return container.Directory("/src/dist")
+}
+
 // Test runs tests using Poetry.
 func (m *Poetry) Test(ctx context.Context, source *dagger.Directory) (string, error) {
 	container := m.getBaseContainer(source).
