@@ -16,7 +16,7 @@ func New() *Versioner {
 	return &Versioner{}
 }
 
-// BumpVersion creates a new version tag based on the latest tag
+// BumpVersion creates a new version tag based on the latest tag and commit type
 func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, outputVersion bool) (string, error) {
 	container := dag.Container().
 		From("alpine:latest").
@@ -58,6 +58,15 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error getting latest tag: %w", err)
 	}
 
+	// Get the latest commit message
+	commitMsg, err := container.WithExec([]string{
+		"sh", "-c",
+		"git log -1 --pretty=%B",
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting commit message: %w", err)
+	}
+
 	var major, minor, patch int
 	if output == "" {
 		major, minor, patch = 0, 1, 0
@@ -67,7 +76,19 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		if err != nil {
 			return "", fmt.Errorf("error parsing version: %w", err)
 		}
-		patch++
+
+		// Determine version bump based on commit message
+		commitMsg = strings.ToLower(strings.TrimSpace(commitMsg))
+		if strings.Contains(commitMsg, "breaking change") || strings.Contains(commitMsg, "!:") {
+			major++
+			minor = 0
+			patch = 0
+		} else if strings.HasPrefix(commitMsg, "feat:") || strings.HasPrefix(commitMsg, "feat(") {
+			minor++
+			patch = 0
+		} else {
+			patch++
+		}
 	}
 
 	// Create new tag
