@@ -86,3 +86,9 @@ dagger.gen.go
 /internal/telemetry
 
 node_modules
+
+# Root-level generated files
+/go.mod
+/go.sum
+/main.go
+/dagger.gen.go
