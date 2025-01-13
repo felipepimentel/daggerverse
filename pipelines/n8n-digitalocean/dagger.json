@@ -8,10 +8,6 @@
       "source": "../../libraries/digitalocean"
     },
     {
-      "name": "docker",
-      "source": "../../libraries/docker"
-    },
-    {
       "name": "n8n",
       "source": "../n8n"
     }
