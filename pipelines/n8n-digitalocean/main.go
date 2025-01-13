@@ -8,6 +8,8 @@ import (
 	"dagger/n8n-digitalocean/internal/dagger"
 )
 
+var client *dagger.Client
+
 // N8NDigitalOcean represents the n8n deployment pipeline for DigitalOcean
 type N8NDigitalOcean struct {
 	// Source directory containing n8n configuration
@@ -26,6 +28,12 @@ type N8NDigitalOcean struct {
 	DOConfig *DOConfig
 }
 
+// New creates a new instance of the n8n-digitalocean module
+func New(c *dagger.Client) *N8NDigitalOcean {
+	client = c
+	return &N8NDigitalOcean{}
+}
+
 // EnvVar represents an environment variable
 type EnvVar struct {
 	Name  string
@@ -40,6 +48,20 @@ type DOConfig struct {
 	InstanceSize string
 }
 
+// CaddyConfig represents the Caddy server configuration
+type CaddyConfig struct {
+	Domain string
+}
+
+// generateCaddyfile creates a Caddyfile configuration
+func (n *N8NDigitalOcean) generateCaddyfile(domain string) string {
+	return fmt.Sprintf(`%s {
+    reverse_proxy n8n:5678 {
+        flush_interval -1
+    }
+}`, domain)
+}
+
 // Deploy builds and deploys n8n to DigitalOcean
 func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error) {
 	if n.Source == nil {
@@ -52,10 +74,14 @@ func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error)
 		return nil, fmt.Errorf("digitalocean token is required")
 	}
 
+	// Create n8n volume
+	n8nVolume := client.CacheVolume("n8n_data")
+
 	// Build n8n container
-	container := dag.Container().
+	container := client.Container().
 		From("node:18-alpine").
 		WithMountedDirectory("/app", n.Source).
+		WithMountedCache("/data", n8nVolume).
 		WithWorkdir("/app").
 		WithExec([]string{"npm", "install", "-g", "n8n"})
 
@@ -84,24 +110,55 @@ func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error)
 		return nil, fmt.Errorf("failed to publish container: %w", err)
 	}
 
-	// Create app spec
+	// Create app spec with Caddy configuration
 	appSpec := fmt.Sprintf(`{
 		"name": "%s",
 		"region": "%s",
-		"services": [{
-			"name": "%s",
-			"instance_size_slug": "%s",
-			"instance_count": 1,
-			"image": {
-				"registry_type": "DOCR",
-				"repository": "%s",
-				"tag": "%s"
+		"services": [
+			{
+				"name": "n8n",
+				"instance_size_slug": "%s",
+				"instance_count": 1,
+				"image": {
+					"registry_type": "DOCR",
+					"repository": "%s",
+					"tag": "%s"
+				},
+				"health_check": {
+					"http_path": "/healthz",
+					"initial_delay_seconds": 30
+				},
+				"volumes": [
+					{
+						"name": "n8n-data",
+						"mount_path": "/data"
+					}
+				]
 			},
-			"health_check": {
-				"http_path": "/healthz"
+			{
+				"name": "caddy",
+				"instance_size_slug": "basic-xxs",
+				"instance_count": 1,
+				"image": {
+					"registry_type": "DOCKER_HUB",
+					"repository": "caddy",
+					"tag": "2.7-alpine"
+				},
+				"volumes": [
+					{
+						"name": "caddy-data",
+						"mount_path": "/data"
+					}
+				],
+				"env": [
+					{
+						"key": "DOMAIN",
+						"value": "%s"
+					}
+				]
 			}
-		}]
-	}`, n.DOConfig.AppName, n.DOConfig.Region, n.DOConfig.AppName, n.DOConfig.InstanceSize, n.Registry, n.Tag)
+		]
+	}`, n.DOConfig.AppName, n.DOConfig.Region, n.DOConfig.InstanceSize, n.Registry, n.Tag, n.EnvVars[0].Value)
 
 	// Get token value
 	token, err := n.DOConfig.Token.Plaintext(ctx)
@@ -110,7 +167,7 @@ func (n *N8NDigitalOcean) Deploy(ctx context.Context) (*dagger.Container, error)
 	}
 
 	// Create a new container with doctl
-	return dag.Container().
+	return client.Container().
 		From("digitalocean/doctl:latest").
 		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
 		WithExec([]string{"apps", "create", "--spec", appSpec}), nil
@@ -129,8 +186,38 @@ func (n *N8NDigitalOcean) GetStatus(ctx context.Context, appID string) (*dagger.
 	}
 
 	// Get app status
-	return dag.Container().
+	return client.Container().
 		From("digitalocean/doctl:latest").
 		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
 		WithExec([]string{"apps", "get", appID, "--format", "json"}), nil
+}
+
+// CI runs the CI pipeline for n8n
+func (n *N8NDigitalOcean) CI(ctx context.Context, source *dagger.Directory, region string, appName string, token *dagger.Secret, domain string, basicAuthPassword string, encryptionKey string, sshKey *dagger.Secret, sshKeyFingerprint string, sshKeyID string) (*dagger.Container, error) {
+	n.Source = source
+	n.Registry = "registry.digitalocean.com/pimentel/n8n"
+	n.Tag = "latest"
+	n.RegistryAuth = token
+	n.DOConfig = &DOConfig{
+		Token:        token,
+		Region:       region,
+		AppName:      appName,
+		InstanceSize: "basic-xxs",
+	}
+
+	// Set environment variables
+	n.EnvVars = []EnvVar{
+		{Name: "N8N_HOST", Value: domain},
+		{Name: "N8N_PROTOCOL", Value: "https"},
+		{Name: "N8N_PORT", Value: "5678"},
+		{Name: "N8N_BASIC_AUTH_ACTIVE", Value: "true"},
+		{Name: "N8N_BASIC_AUTH_USER", Value: "admin"},
+		{Name: "N8N_BASIC_AUTH_PASSWORD", Value: basicAuthPassword},
+		{Name: "N8N_ENCRYPTION_KEY", Value: encryptionKey},
+		{Name: "NODE_ENV", Value: "production"},
+		{Name: "DB_TYPE", Value: "sqlite"},
+		{Name: "DB_SQLITE_PATH", Value: "/home/node/.n8n/database.sqlite"},
+	}
+
+	return n.Deploy(ctx)
 }
