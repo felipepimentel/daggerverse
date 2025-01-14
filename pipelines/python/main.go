@@ -166,7 +166,7 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 
 	// Get the next version using semantic-release
 	version, err := container.
-		WithExec([]string{"semantic-release", "version", "--print"}).
+		WithExec([]string{"semantic-release", "version", "--no-commit", "--no-tag"}).
 		Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to determine version: %w", err)
@@ -186,9 +186,14 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		return fmt.Errorf("failed to publish package: %w", err)
 	}
 
-	// Create and push git tag
-	container = container.
-		WithExec([]string{"semantic-release", "publish"})
+	// Create and push tag if GitHub token is provided
+	if m.githubToken != nil {
+		container = container.WithSecretVariable("GITHUB_TOKEN", m.githubToken)
+		_, err = container.WithExec([]string{"semantic-release", "publish"}).Stdout(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to create and push tag: %w", err)
+		}
+	}
 
 	return nil
 }
