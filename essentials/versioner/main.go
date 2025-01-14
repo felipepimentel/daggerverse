@@ -49,13 +49,13 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 			WithExec([]string{"git", "pull", "--rebase", "origin", "main"})
 	}
 
-	// Get the latest tag
+	// Get all tags sorted by version
 	output, err := container.WithExec([]string{
 		"sh", "-c",
-		"git tag -l 'v*' | sort -V | tail -n 1",
+		"git tag -l 'v*' | sort -V",
 	}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error getting latest tag: %w", err)
+		return "", fmt.Errorf("error getting tags: %w", err)
 	}
 
 	// Get the latest commit message
@@ -67,14 +67,22 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error getting commit message: %w", err)
 	}
 
+	// Find the highest version among all tags
 	var major, minor, patch int
-	if output == "" {
+	tags := strings.Split(strings.TrimSpace(output), "\n")
+	if len(tags) == 0 || (len(tags) == 1 && tags[0] == "") {
 		major, minor, patch = 0, 1, 0
 	} else {
-		version := strings.TrimPrefix(strings.TrimSpace(output), "v")
-		_, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch)
-		if err != nil {
-			return "", fmt.Errorf("error parsing version: %w", err)
+		for _, tag := range tags {
+			var m, n, p int
+			version := strings.TrimPrefix(strings.TrimSpace(tag), "v")
+			_, err := fmt.Sscanf(version, "%d.%d.%d", &m, &n, &p)
+			if err == nil {
+				// Update highest version found
+				if m > major || (m == major && n > minor) || (m == major && n == minor && p > patch) {
+					major, minor, patch = m, n, p
+				}
+			}
 		}
 
 		// Determine version bump based on commit message
@@ -87,6 +95,7 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 			minor++
 			patch = 0
 		} else {
+			// For any other commit type (including non-semantic commits), increment patch
 			patch++
 		}
 	}
