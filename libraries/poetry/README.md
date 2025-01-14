@@ -9,37 +9,38 @@ A Dagger module for managing Python projects with Poetry. This module provides e
 - Run tests
 - Update dependencies
 - Manage lock files
+- Custom base image support
 
 ## Usage
 
 Import the module in your Dagger pipeline:
 
 ```go
-poetry := dag.PythonPoetry()
+poetry := dag.Poetry()
 ```
 
 ### Installing Dependencies
 
 ```go
-installed, err := poetry.With(source).Install(ctx)
-if err != nil {
-    // Handle error
-}
+// Install dependencies
+output := poetry.Install(dag.Host().Directory("."))
 ```
 
 ### Building Package
 
 ```go
-built, err := poetry.With(source).Build(ctx)
-if err != nil {
-    // Handle error
-}
+// Build package
+dist := poetry.Build(dag.Host().Directory("."))
+
+// Build with specific version
+dist := poetry.BuildWithVersion(dag.Host().Directory("."), "1.0.0")
 ```
 
 ### Running Tests
 
 ```go
-output, err := poetry.With(source).Test(ctx)
+// Run tests
+output, err := poetry.Test(ctx, dag.Host().Directory("."))
 if err != nil {
     // Handle error
 }
@@ -49,19 +50,11 @@ fmt.Println("Test output:", output)
 ### Updating Dependencies
 
 ```go
-updated, err := poetry.With(source).Update(ctx)
-if err != nil {
-    // Handle error
-}
-```
+// Update dependencies
+updated := poetry.Update(dag.Host().Directory("."))
 
-### Managing Lock File
-
-```go
-locked, err := poetry.With(source).Lock(ctx)
-if err != nil {
-    // Handle error
-}
+// Update lock file
+locked := poetry.Lock(dag.Host().Directory("."))
 ```
 
 ## Requirements
@@ -72,7 +65,7 @@ if err != nil {
 
 ## Environment
 
-The module uses `python:3.12-slim` as the base image and automatically installs Poetry.
+The module uses `python:3.12-alpine` as the base image and automatically installs Poetry.
 
 ## Example
 
@@ -80,20 +73,21 @@ Here's a complete example of using the module:
 
 ```go
 func BuildProject(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-    poetry := dag.PythonPoetry()
+    poetry := dag.Poetry()
 
     // Install dependencies
-    installed, err := poetry.With(source).Install(ctx)
-    if err != nil {
-        return nil, err
-    }
+    installed := poetry.Install(source)
 
     // Run tests
-    if _, err := poetry.With(installed).Test(ctx); err != nil {
+    if _, err := poetry.Test(ctx, installed); err != nil {
         return nil, err
     }
 
-    // Build package
-    return poetry.With(installed).Build(ctx)
+    // Build package with version
+    return poetry.BuildWithVersion(installed, "1.0.0"), nil
 }
 ```
+
+## License
+
+This module is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
