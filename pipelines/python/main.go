@@ -153,12 +153,20 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release"}).
-		WithExec([]string{
-			"semantic-release",
-			"version",
-			"--no-commit",
-			"--no-tag",
-		})
+		WithExec([]string{"git", "config", "--global", "user.email", p.gitEmail}).
+		WithExec([]string{"git", "config", "--global", "user.name", p.gitName})
+
+	// Configure semantic-release to use the GitHub token if provided
+	if p.githubToken != nil {
+		container = container.WithSecretVariable("GH_TOKEN", p.githubToken)
+	}
+
+	// Run semantic-release to determine and set the new version
+	container = container.WithExec([]string{
+		"semantic-release",
+		"version",
+		"--print",
+	})
 
 	// Get the new version from pyproject.toml
 	version, err := container.WithExec([]string{
