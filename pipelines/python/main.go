@@ -150,10 +150,12 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		WithExec([]string{"git", "config", "--global", "user.email", "actions@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions"})
 
-	// Fetch complete git history if token is provided
-	if token != nil {
-		container = container.WithSecretVariable("GITHUB_TOKEN", token)
-		container = container.WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
+	// Configure git and fetch complete history if token is provided
+	if m.githubToken != nil {
+		container = container.
+			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"}).
+			WithExec([]string{"sh", "-c", "if git rev-parse --is-shallow-repository | grep -q true; then git fetch --unshallow --tags; else git fetch --tags; fi"})
 	}
 
 	// Run semantic-release to determine and set new version
