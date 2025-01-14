@@ -7,217 +7,228 @@ nav_order: 1
 
 # Docker Module
 
-The Docker module provides a seamless integration with Docker Engine, allowing you to manage containers, images, and Docker operations within your Dagger pipelines.
+This module provides a comprehensive integration with Docker Engine, allowing you to manage containers, images, and Docker operations directly through Dagger.
 
 ## Features
 
-- Spawn ephemeral Docker Engine instances
-- Execute Docker CLI commands
-- Manage Docker images (pull, push, import)
-- Run containers
-- State persistence options
+- Ephemeral Docker Engine management
+- Docker CLI integration
+- Image pulling and pushing
+- Container import/export
+- State persistence
+- Registry authentication
+- Image management
+- Container execution
 
 ## Installation
 
-To use the Docker module in your Dagger pipeline:
-
-```go
-import (
-    "dagger.io/dagger"
-    "github.com/felipepimentel/daggerverse/libraries/docker"
-)
+```bash
+dagger mod use github.com/felipepimentel/daggerverse/libraries/docker@latest
 ```
 
-## Usage Examples
+## Usage
 
-### Basic Docker Engine Setup
+### Basic Example
 
 ```go
-func (m *MyModule) Example(ctx context.Context) (*Container, error) {
-    docker := dag.Docker()
-    
-    // Start a Docker engine with default settings
-    engine := docker.Engine()
-    
-    // Create a CLI instance connected to the engine
-    cli := docker.CLI()
-    
-    return cli.Container(), nil
+// Initialize the module
+docker := dag.Docker()
+
+// Create a Docker engine
+engine := docker.Engine("24.0", true, "my-namespace")
+
+// Get a CLI instance
+cli := docker.CLI("24.0", engine)
+```
+
+## Docker Engine
+
+### Starting an Engine
+
+```go
+// Start an ephemeral engine
+engine := docker.Engine("24.0", false, "")
+
+// Start a persistent engine
+engine := docker.Engine("24.0", true, "my-namespace")
+```
+
+### Configuration Options
+
+```go
+func (e *Docker) Engine(
+    // Docker Engine version
+    version string,    // default: "24.0"
+    // Persist the state
+    persist bool,      // default: true
+    // Namespace for state
+    namespace string,
+) *dagger.Service
+```
+
+## Docker CLI
+
+### Basic CLI Operations
+
+```go
+// Get a CLI instance
+cli := docker.CLI("24.0", nil)  // nil for ephemeral engine
+
+// Pull an image
+image, err := cli.Pull(ctx, "alpine", "latest")
+
+// Push an image
+ref, err := cli.Push(ctx, "my-registry/alpine", "latest")
+```
+
+### Chaining Operations
+
+```go
+// Pull and chain operations
+cli, err := cli.WithPull(ctx, "alpine", "latest")
+if err != nil {
+    return err
 }
+
+// Push and chain operations
+cli, err = cli.WithPush(ctx, "my-registry/alpine", "latest")
+```
+
+### Container Management
+
+```go
+// Import a container
+container := dag.Container().From("alpine:latest")
+image, err := cli.Import(ctx, container)
+
+// Run a container
+output, err := cli.Run(ctx, "alpine", "latest", []string{"echo", "hello"})
+```
+
+## Image Management
+
+### Image Operations
+
+```go
+// Look up an image
+image, err := cli.Image(ctx, "alpine", "latest", "")
+
+// List images
+images, err := cli.Images(ctx, "alpine", "latest", "")
+
+// Duplicate an image
+newImage, err := image.Duplicate(ctx, "my-registry/alpine", "v2")
+
+// Export an image
+container := image.Export()
+
+// Push an image
+ref, err := image.Push(ctx)
+```
+
+## Best Practices
+
+1. **Engine Management**:
+   - Use persistent engines for long-running operations
+   - Use namespaces to isolate different workloads
+   - Clean up unused engines
+
+2. **Image Handling**:
+   - Tag images appropriately
+   - Use specific versions instead of 'latest'
+   - Clean up unused images
+
+3. **Performance**:
+   - Reuse CLI instances
+   - Use image caching
+   - Optimize container layers
+
+## Common Issues
+
+1. **Engine Connection**:
+   - Verify engine version compatibility
+   - Check network connectivity
+   - Validate service bindings
+
+2. **Image Operations**:
+   - Ensure registry authentication
+   - Check image name format
+   - Verify pull/push permissions
+
+3. **Container Operations**:
+   - Monitor resource usage
+   - Check container logs
+   - Validate mount points
+
+## Examples
+
+### Complete Workflow
+
+```go
+// Initialize Docker
+docker := dag.Docker()
+
+// Create persistent engine
+engine := docker.Engine("24.0", true, "production")
+
+// Get CLI
+cli := docker.CLI("24.0", engine)
+
+// Pull base image
+baseImage, err := cli.Pull(ctx, "alpine", "latest")
+if err != nil {
+    return err
+}
+
+// Create custom image
+container := dag.Container().
+    From("alpine:latest").
+    WithExec([]string{"apk", "add", "python3"})
+
+// Import custom image
+customImage, err := cli.Import(ctx, container)
+if err != nil {
+    return err
+}
+
+// Tag and push
+newImage, err := customImage.Duplicate(ctx, "my-registry/python-alpine", "v1")
+if err != nil {
+    return err
+}
+
+// Push to registry
+ref, err := newImage.Push(ctx)
+```
+
+### Registry Authentication
+
+```go
+// Create authenticated CLI
+cli := docker.CLI("24.0", nil).
+    WithEnvVariable("DOCKER_USERNAME", "user").
+    WithEnvVariable("DOCKER_PASSWORD", dag.SetSecret("docker_password", "password"))
+
+// Push to private registry
+ref, err := cli.Push(ctx, "private-registry/image", "latest")
 ```
 
 ### Custom Engine Configuration
 
 ```go
-func (m *MyModule) CustomEngine(ctx context.Context) (*Container, error) {
-    docker := dag.Docker()
-    
-    // Start a Docker engine with custom version and persistence
-    engine := docker.Engine(
-        dagger.EngineOpts{
-            Version: "24.0",
-            Persist: true,
-            Namespace: "my-project",
-        },
-    )
-    
-    return docker.CLI(dagger.CLIOpts{
-        Engine: engine,
-    }).Container(), nil
-}
+// Create engine with custom configuration
+engine := docker.Engine("24.0", true, "custom").
+    WithEnvVariable("DOCKER_TLS_VERIFY", "1").
+    WithMountedDirectory("/certs", dag.Host().Directory("./certs"))
+
+// Use custom engine
+cli := docker.CLI("24.0", engine)
 ```
 
-### Image Operations
+## Contributing
 
-```go
-func (m *MyModule) ImageOps(ctx context.Context) error {
-    docker := dag.Docker()
-    cli := docker.CLI()
-    
-    // Pull an image
-    image, err := cli.Pull(ctx, "alpine", "latest")
-    if err != nil {
-        return err
-    }
-    
-    // Push an image
-    _, err = cli.Push(ctx, "my-registry/alpine", "custom-tag")
-    if err != nil {
-        return err
-    }
-    
-    return nil
-}
-```
+Contributions are welcome! Please read our [Contributing Guidelines](../CONTRIBUTING.md) for details on how to submit pull requests.
 
-### Running Containers
+## License
 
-```go
-func (m *MyModule) RunContainer(ctx context.Context) (string, error) {
-    docker := dag.Docker()
-    cli := docker.CLI()
-    
-    // Run a container with custom arguments
-    output, err := cli.Run(ctx, "alpine", "latest", []string{
-        "echo",
-        "Hello from Docker!",
-    })
-    
-    return output, err
-}
-```
-
-## GitHub Actions Integration
-
-You can use this module in your GitHub Actions workflows:
-
-```yaml
-name: Docker Operations
-on: [push]
-
-jobs:
-  docker-ops:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Docker Operations with Dagger
-        uses: dagger/dagger-action@v1
-        with:
-          module: github.com/felipepimentel/daggerverse/libraries/docker
-          args: |
-            do -p '
-              docker := Docker()
-              cli := docker.CLI()
-              cli.Pull(ctx, "alpine", "latest")
-            '
-```
-
-## API Reference
-
-### Docker
-
-Main module struct that provides access to Docker functionality.
-
-#### Methods
-
-- `Engine(version string, persist bool, namespace string) *Service`
-  - Spawns an ephemeral Docker Engine
-  - Parameters:
-    - `version`: Docker Engine version (default: "24.0")
-    - `persist`: Whether to persist engine state (default: true)
-    - `namespace`: Namespace for persistence
-
-- `CLI(version string, engine *Service) *CLI`
-  - Creates a Docker CLI instance
-  - Parameters:
-    - `version`: Docker CLI version (default: "24.0")
-    - `engine`: Optional custom engine instance
-
-### CLI
-
-Docker CLI wrapper providing command execution capabilities.
-
-#### Methods
-
-- `Pull(repository string, tag string) (*Image, error)`
-  - Pulls an image from a registry
-  
-- `Push(repository string, tag string) (string, error)`
-  - Pushes an image to a registry
-  
-- `Import(container *Container) (*Image, error)`
-  - Imports a container as an image
-  
-- `Run(name string, tag string, args []string) (string, error)`
-  - Runs a container with specified arguments
-
-### Image
-
-Represents a Docker image in the engine.
-
-#### Methods
-
-- `Export() *Container`
-  - Exports the image as a container
-  
-- `Duplicate(repository string, tag string) (*Image, error)`
-  - Creates a copy of the image with new tags
-  
-- `Push(ctx context.Context) (string, error)`
-  - Pushes the image to a registry
-
-## Best Practices
-
-1. **Engine Persistence**
-   - Use persistence for long-running pipelines
-   - Use namespaces to isolate different projects
-
-2. **Resource Management**
-   - Clean up unused images and containers
-   - Use appropriate tags for versioning
-
-3. **Security**
-   - Avoid running containers with root privileges
-   - Use specific versions instead of 'latest' tag
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Connection Issues**
-   ```
-   Error: Cannot connect to the Docker daemon
-   Solution: Ensure the Docker engine is running and accessible
-   ```
-
-2. **Permission Issues**
-   ```
-   Error: Permission denied
-   Solution: Check if the necessary capabilities are granted
-   ```
-
-3. **Image Pull Failures**
-   ```
-   Error: Image pull failed
-   Solution: Verify registry credentials and image name/tag
-   ``` 
+This module is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details. 
