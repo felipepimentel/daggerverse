@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/felipepimentel/daggerverse/pipelines/python/internal/dagger"
 )
@@ -146,24 +147,27 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		}
 	}
 
-	// Setup base container with git and poetry
+	// Create base container
 	container := dag.Container().
 		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release", "tomli"}).
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release", "tomli"})
+
+	// Configure git
+	container = container.
 		WithExec([]string{"git", "config", "--global", "user.email", p.gitEmail}).
 		WithExec([]string{"git", "config", "--global", "user.name", p.gitName})
 
-	// Ensure we have complete git history if token is provided
+	// If GitHub token is provided, fetch complete history
 	if p.githubToken != nil {
 		container = container.
-			WithSecretVariable("GH_TOKEN", p.githubToken).
+			WithSecretVariable("GITHUB_TOKEN", p.githubToken).
 			WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
 	}
 
-	// Run semantic-release to determine the next version
+	// Run semantic-release to determine new version
 	container = container.WithExec([]string{
 		"semantic-release",
 		"version",
@@ -171,14 +175,15 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		"--no-tag",
 	})
 
-	// Get the new version from pyproject.toml
+	// Read version from pyproject.toml using tomli
 	version, err := container.WithExec([]string{
 		"python", "-c",
-		"import tomli; f=open('pyproject.toml', 'rb'); data=tomli.load(f); print(data['tool']['poetry']['version'])",
+		"import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['poetry']['version'])",
 	}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
 	}
+	version = strings.TrimSpace(version)
 
 	fmt.Printf(logSuccessVersion+"\n", version)
 
