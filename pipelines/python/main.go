@@ -146,11 +146,24 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		}
 	}
 
-	// Get version from versioner module
-	opts := dagger.VersionerOpts{
-		GithubToken: p.githubToken,
-	}
-	version, err := dag.Versioner(opts).BumpVersion(ctx, source, true)
+	// Install Python Semantic Release and update version
+	container := dag.Container().
+		From("python:3.12-alpine").
+		WithDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"pip", "install", "python-semantic-release"}).
+		WithExec([]string{
+			"semantic-release",
+			"version",
+			"--no-commit",
+			"--no-tag",
+		})
+
+	// Get the new version from pyproject.toml
+	version, err := container.WithExec([]string{
+		"python", "-c",
+		"from configparser import ConfigParser; c=ConfigParser(); c.read('pyproject.toml'); print(c['tool.poetry']['version'])",
+	}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
 	}
@@ -167,6 +180,13 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		return "", fmt.Errorf("%s: %w", errPypiPublish, err)
 	}
 	fmt.Println(logSuccessPyPI)
+
+	// Create and push git tag
+	container = container.WithExec([]string{
+		"semantic-release",
+		"publish",
+		"--no-build",
+	})
 
 	return version, nil
 }
@@ -230,51 +250,5 @@ func (p *Python) Lint(ctx context.Context, source *dagger.Directory) error {
 // It returns the configured container.
 func (p *Python) BuildEnv(ctx context.Context, source *dagger.Directory) *dagger.Container {
 	return p.Build(ctx, source)
-}
-
-// CICD runs the complete CI/CD pipeline for a Python project
-func (m *Python) CICD(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
-	// Install Python Semantic Release
-	container := dag.Container().
-		From("python:3.12-alpine").
-		WithExec([]string{"pip", "install", "python-semantic-release"})
-
-	// Run semantic-release to update version and create tag
-	container = container.
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{
-			"semantic-release",
-			"version",
-			"--no-commit",
-			"--no-tag",
-		})
-
-	// Get the new version from pyproject.toml
-	version, err := container.WithExec([]string{
-		"python", "-c",
-		"from configparser import ConfigParser; c=ConfigParser(); c.read('pyproject.toml'); print(c['tool.poetry']['version'])",
-	}).Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	// Build with the new version
-	dist := dag.Poetry().BuildWithVersion(source, version)
-
-	// Publish using PyPI module
-	err = dag.Pypi().Publish(ctx, dist, token)
-	if err != nil {
-		return fmt.Errorf("error publishing package: %w", err)
-	}
-
-	// Create and push git tag
-	container = container.WithExec([]string{
-		"semantic-release",
-		"publish",
-		"--no-build",
-	})
-
-	return nil
 }
 
