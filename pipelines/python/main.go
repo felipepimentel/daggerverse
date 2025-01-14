@@ -146,34 +146,33 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		}
 	}
 
-	// Install Python Semantic Release and update version
+	// Setup base container with git and poetry
 	container := dag.Container().
 		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release"}).
+		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release", "tomli"}).
 		WithExec([]string{"git", "config", "--global", "user.email", p.gitEmail}).
 		WithExec([]string{"git", "config", "--global", "user.name", p.gitName})
 
-	// Configure semantic-release to use the GitHub token if provided
+	// Ensure we have complete git history if token is provided
 	if p.githubToken != nil {
 		container = container.
 			WithSecretVariable("GH_TOKEN", p.githubToken).
 			WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
 	}
 
-	// Run semantic-release to determine and set the new version
+	// Run semantic-release to determine the next version
 	container = container.WithExec([]string{
 		"semantic-release",
 		"version",
-		"--no-vcs-release",
+		"--no-commit",
+		"--no-tag",
 	})
 
 	// Get the new version from pyproject.toml
 	version, err := container.WithExec([]string{
-		"pip", "install", "tomli",
-	}).WithExec([]string{
 		"python", "-c",
 		"import tomli; f=open('pyproject.toml', 'rb'); data=tomli.load(f); print(data['tool']['poetry']['version'])",
 	}).Stdout(ctx)
@@ -194,7 +193,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	}
 	fmt.Println(logSuccessPyPI)
 
-	// Create and push git tag
+	// Create and push git tag if we have GitHub token
 	if p.githubToken != nil {
 		container = container.WithExec([]string{
 			"semantic-release",
