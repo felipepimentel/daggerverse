@@ -136,51 +136,61 @@ func New(
 }
 
 // Publish builds and publishes a Python package to PyPI
-func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) error {
 	// Create base container with git and poetry
 	container := dag.Container().
 		From("python:3.12-alpine").
-		WithDirectory("/src", source).
-		WithWorkdir("/src").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release", "tomli"})
 
 	// Configure git for semantic-release
 	container = container.
-		WithExec([]string{"git", "config", "--global", "user.email", "actions@users.noreply.github.com"}).
-		WithExec([]string{"git", "config", "--global", "user.name", "github-actions"})
+		WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
+		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
-	// Configure git and fetch complete history if token is provided
-	if m.githubToken != nil {
-		container = container.
-			WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
-			WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"}).
-			WithExec([]string{"sh", "-c", "if git rev-parse --is-shallow-repository | grep -q true; then git fetch --unshallow --tags; else git fetch --tags; fi"})
+	// Mount source code
+	container = container.WithMountedDirectory("/src", source).WithWorkdir("/src")
+
+	// Check if repository is shallow
+	isShallow, err := container.WithExec([]string{"git", "rev-parse", "--is-shallow-repository"}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if repository is shallow: %w", err)
 	}
 
-	// Run semantic-release to determine and set new version
-	container = container.WithExec([]string{"semantic-release", "version", "--no-commit", "--no-tag"})
+	// If repository is shallow, unshallow it
+	if strings.TrimSpace(isShallow) == "true" {
+		container = container.WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
+	} else {
+		container = container.WithExec([]string{"git", "fetch", "--tags"})
+	}
 
-	// Read the new version from pyproject.toml
-	version, err := container.WithExec([]string{"python", "-c", "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['poetry']['version'])"}).Stdout(ctx)
+	// Get the next version using semantic-release
+	version, err := container.
+		WithExec([]string{"semantic-release", "version", "--print"}).
+		Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error reading version: %w", err)
+		return fmt.Errorf("failed to determine version: %w", err)
 	}
 	version = strings.TrimSpace(version)
 
-	// Build and publish the package
-	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
-	_, err = container.WithExec([]string{"poetry", "publish"}).Stdout(ctx)
+	// Update version in pyproject.toml
+	container = container.WithExec([]string{"poetry", "version", version})
+
+	// Build the package
+	dist := dag.Poetry().BuildWithVersion(source, version)
+
+	// Publish to PyPI
+	err = dag.Pypi().
+		Publish(ctx, dist, token)
 	if err != nil {
-		return "", fmt.Errorf("error publishing package: %w", err)
+		return fmt.Errorf("failed to publish package: %w", err)
 	}
 
-	// Create and push git tag if token is provided
-	if token != nil {
-		container = container.WithExec([]string{"semantic-release", "publish"})
-	}
+	// Create and push git tag
+	container = container.
+		WithExec([]string{"semantic-release", "publish"})
 
-	return fmt.Sprintf("Published version %s", version), nil
+	return nil
 }
 
 // Build creates a container with all dependencies installed and configured.
