@@ -162,8 +162,10 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 
 	// Get the new version from pyproject.toml
 	version, err := container.WithExec([]string{
+		"pip", "install", "tomli",
+	}).WithExec([]string{
 		"python", "-c",
-		"from configparser import ConfigParser; c=ConfigParser(); c.read('pyproject.toml'); print(c['tool.poetry']['version'])",
+		"import tomli; f=open('pyproject.toml', 'rb'); data=tomli.load(f); print(data['tool']['poetry']['version'])",
 	}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
