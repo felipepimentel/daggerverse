@@ -75,6 +75,9 @@ type Python struct {
 	skipTests bool
 	// skipLint indicates whether to skip running linting checks
 	skipLint bool
+	// githubToken is used for GitHub authentication
+	// +private
+	githubToken *dagger.Secret
 }
 
 // New creates a new instance of Python with the provided configuration.
@@ -105,6 +108,9 @@ func New(
 	// +optional
 	// +default=false
 	skipLint bool,
+	// GitHub token for authentication
+	// +optional
+	githubToken *dagger.Secret,
 ) *Python {
 	if pythonVersion == "" {
 		pythonVersion = DefaultPythonVersion
@@ -124,6 +130,7 @@ func New(
 		dockerPassword:  dockerPassword,
 		skipTests:       skipTests,
 		skipLint:        skipLint,
+		githubToken:     githubToken,
 	}
 }
 
@@ -140,7 +147,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	}
 
 	// Get version from versioner module
-	version, err := dag.Versioner().BumpVersion(ctx, source, true)
+	version, err := dag.Versioner(p.githubToken).BumpVersion(ctx, source, true)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
 	}
