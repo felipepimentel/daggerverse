@@ -147,7 +147,10 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	}
 
 	// Get version from versioner module
-	version, err := dag.Versioner(p.githubToken).BumpVersion(ctx, source, true)
+	opts := dagger.VersionerOpts{
+		GithubToken: p.githubToken,
+	}
+	version, err := dag.Versioner(opts).BumpVersion(ctx, source, true)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", errGetVersion, err)
 	}
