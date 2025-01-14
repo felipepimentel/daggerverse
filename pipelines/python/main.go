@@ -135,19 +135,9 @@ func New(
 	}
 }
 
-// Publish builds, tests, and publishes the Python package to PyPI.
-// It returns the version of the published package or an error if any step fails.
-func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
-	fmt.Println(logStartPublish)
-
-	// Run tests first if not skipped
-	if !p.skipTests {
-		if _, err := p.Test(ctx, source); err != nil {
-			return "", fmt.Errorf("tests failed: %w", err)
-		}
-	}
-
-	// Create base container
+// Publish builds and publishes a Python package to PyPI
+func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *dagger.Secret) (string, error) {
+	// Create base container with git and poetry
 	container := dag.Container().
 		From("python:3.12-alpine").
 		WithDirectory("/src", source).
@@ -155,59 +145,40 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithExec([]string{"pip", "install", "--no-cache-dir", "poetry", "python-semantic-release", "tomli"})
 
-	// Configure git
+	// Configure git for semantic-release
 	container = container.
-		WithExec([]string{"git", "config", "--global", "user.email", p.gitEmail}).
-		WithExec([]string{"git", "config", "--global", "user.name", p.gitName})
+		WithExec([]string{"git", "config", "--global", "user.email", "actions@users.noreply.github.com"}).
+		WithExec([]string{"git", "config", "--global", "user.name", "github-actions"})
 
-	// If GitHub token is provided, fetch complete history
-	if p.githubToken != nil {
-		container = container.
-			WithSecretVariable("GITHUB_TOKEN", p.githubToken).
-			WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
+	// Fetch complete git history if token is provided
+	if token != nil {
+		container = container.WithSecretVariable("GITHUB_TOKEN", token)
+		container = container.WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
 	}
 
-	// Run semantic-release to determine new version
-	container = container.WithExec([]string{
-		"semantic-release",
-		"version",
-		"--no-commit",
-		"--no-tag",
-	})
+	// Run semantic-release to determine and set new version
+	container = container.WithExec([]string{"semantic-release", "version", "--no-commit", "--no-tag"})
 
-	// Read version from pyproject.toml using tomli
-	version, err := container.WithExec([]string{
-		"python", "-c",
-		"import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['poetry']['version'])",
-	}).Stdout(ctx)
+	// Read the new version from pyproject.toml
+	version, err := container.WithExec([]string{"python", "-c", "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['poetry']['version'])"}).Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", errGetVersion, err)
+		return "", fmt.Errorf("error reading version: %w", err)
 	}
 	version = strings.TrimSpace(version)
 
-	fmt.Printf(logSuccessVersion+"\n", version)
-
-	fmt.Println(logStartBuild)
-	// Build package using Poetry module with the new version
-	buildDir := dag.Poetry().BuildWithVersion(source, version)
-
-	fmt.Println(logStartPyPI)
-	// Publish to PyPI using the pypi module
-	if err := dag.Pypi().Publish(ctx, buildDir, token); err != nil {
-		return "", fmt.Errorf("%s: %w", errPypiPublish, err)
-	}
-	fmt.Println(logSuccessPyPI)
-
-	// Create and push git tag if we have GitHub token
-	if p.githubToken != nil {
-		container = container.WithExec([]string{
-			"semantic-release",
-			"publish",
-			"--no-build",
-		})
+	// Build and publish the package
+	container = container.WithSecretVariable("POETRY_PYPI_TOKEN_PYPI", token)
+	_, err = container.WithExec([]string{"poetry", "publish"}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error publishing package: %w", err)
 	}
 
-	return version, nil
+	// Create and push git tag if token is provided
+	if token != nil {
+		container = container.WithExec([]string{"semantic-release", "publish"})
+	}
+
+	return fmt.Sprintf("Published version %s", version), nil
 }
 
 // Build creates a container with all dependencies installed and configured.
