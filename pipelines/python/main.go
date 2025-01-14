@@ -158,14 +158,16 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 
 	// Configure semantic-release to use the GitHub token if provided
 	if p.githubToken != nil {
-		container = container.WithSecretVariable("GH_TOKEN", p.githubToken)
+		container = container.
+			WithSecretVariable("GH_TOKEN", p.githubToken).
+			WithExec([]string{"git", "fetch", "--unshallow", "--tags"})
 	}
 
 	// Run semantic-release to determine and set the new version
 	container = container.WithExec([]string{
 		"semantic-release",
 		"version",
-		"--print",
+		"--no-vcs-release",
 	})
 
 	// Get the new version from pyproject.toml
@@ -193,11 +195,13 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 	fmt.Println(logSuccessPyPI)
 
 	// Create and push git tag
-	container = container.WithExec([]string{
-		"semantic-release",
-		"publish",
-		"--no-build",
-	})
+	if p.githubToken != nil {
+		container = container.WithExec([]string{
+			"semantic-release",
+			"publish",
+			"--no-build",
+		})
+	}
 
 	return version, nil
 }
