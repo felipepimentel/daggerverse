@@ -151,6 +151,7 @@ func (p *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		From("python:3.12-alpine").
 		WithDirectory("/src", source).
 		WithWorkdir("/src").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithExec([]string{"pip", "install", "python-semantic-release"}).
 		WithExec([]string{
 			"semantic-release",
