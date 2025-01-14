@@ -5,258 +5,204 @@ parent: Libraries
 nav_order: 12
 ---
 
-# Poetry Module
+# Poetry Library
 
-The Poetry module provides integration with [Poetry](https://python-poetry.org/), a modern dependency management and packaging tool for Python. This module allows you to manage Python dependencies and build packages in your Dagger pipelines.
+This module provides comprehensive integration with Poetry for Python project management, including dependency management, building, testing, and package publishing.
 
 ## Features
 
+- Poetry installation and configuration
 - Dependency management
-- Package building
-- Virtual environment handling
+- Package building with version control
+- Test execution
 - Lock file management
-- Project initialization
-- Package publishing
-- Development dependencies
-- Build isolation
+- Dependency updates
+- Custom Python base image support
+- Virtual environment configuration
 
 ## Installation
 
-To use the Poetry module in your Dagger pipeline:
-
-```go
-import (
-    "dagger.io/dagger"
-    "github.com/felipepimentel/daggerverse/libraries/poetry"
-)
+```bash
+dagger mod use github.com/felipepimentel/daggerverse/libraries/poetry@latest
 ```
 
-## Usage Examples
+## Usage
 
-### Basic Package Installation
+### Basic Example
 
 ```go
-func (m *MyModule) Example(ctx context.Context) (*Container, error) {
-    poetry := dag.Poetry().New()
-    
-    // Install dependencies
-    return poetry.Install(
-        ctx,
-        dag.Directory("./python-project"),  // project directory
-        false,                             // no dev dependencies
-        nil,                              // default Python version
-    )
+// Initialize the module
+poetry := dag.Poetry().WithBaseImage("python:3.12-alpine")
+
+// Install dependencies
+output := poetry.Install(dag.Host().Directory("."))
+```
+
+### Configuration Options
+
+```go
+type Poetry struct {
+    // Base image for Poetry operations
+    BaseImage string // default: "python:3.12-alpine"
 }
 ```
 
-### Package Building
+## Package Management
+
+### Installing Dependencies
 
 ```go
-func (m *MyModule) BuildPackage(ctx context.Context) (*File, error) {
-    poetry := dag.Poetry().New()
-    
-    // Build package
-    return poetry.Build(
-        ctx,
-        dag.Directory("./python-project"),
-        "wheel",  // format
-        map[string]string{
-            "python-version": "3.9",
-        },
-    )
-}
+// Install project dependencies
+output := poetry.Install(dag.Host().Directory("."))
 ```
 
-### Development Environment
+### Building Packages
 
 ```go
-func (m *MyModule) DevEnv(ctx context.Context) (*Container, error) {
-    poetry := dag.Poetry().New()
-    
-    // Setup development environment
-    return poetry.Install(
-        ctx,
-        dag.Directory("./python-project"),
-        true,   // include dev dependencies
-        "3.9",  // Python version
-    )
-}
+// Build package
+dist := poetry.Build(dag.Host().Directory("."))
+
+// Build with specific version
+dist := poetry.BuildWithVersion(dag.Host().Directory("."), "1.0.0")
+```
+
+### Testing
+
+```go
+// Run tests
+output, err := poetry.Test(ctx, dag.Host().Directory("."))
+```
+
+### Dependency Management
+
+```go
+// Update lock file
+output := poetry.Lock(dag.Host().Directory("."))
+
+// Update dependencies
+output := poetry.Update(dag.Host().Directory("."))
 ```
 
 ## GitHub Actions Integration
 
-You can use this module in your GitHub Actions workflows:
+Create a workflow file `.github/workflows/poetry.yml`:
 
 ```yaml
 name: Python Package
-on: [push]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Package
-        uses: dagger/dagger-action@v1
+      
+      - name: Install Dagger CLI
+        uses: dagger/dagger-for-github@v5
         with:
-          module: github.com/felipepimentel/daggerverse/libraries/poetry
-          args: |
-            do -p '
-              poetry := Poetry().New()
-              poetry.Build(
-                ctx,
-                dag.Directory("./python-project"),
-                "wheel",
-                map[string]string{
-                  "python-version": "3.9",
-                },
-              )
-            '
+          version: "0.9.3"
+      
+      - name: Build and Test
+        run: |
+          dagger call --progress=plain \
+            test \
+            --source .
+
+      - name: Build Package
+        run: |
+          dagger call --progress=plain \
+            build \
+            --source . \
+            --version "1.0.0"
 ```
 
-## API Reference
+## Examples
 
-### Poetry
+### Custom Base Image
 
-Main module struct that provides access to Poetry functionality.
+```go
+poetry := dag.Poetry().
+    WithBaseImage("python:3.11-slim")
+```
 
-#### Constructor
+### Complete Build Pipeline
 
-- `New() *Poetry`
-  - Creates a new Poetry instance
-  - Default version: "latest"
-  - Default platform: "linux/amd64"
+```go
+// Initialize with custom image
+poetry := dag.Poetry().
+    WithBaseImage("python:3.12-alpine")
 
-#### Methods
+// Install dependencies
+installed := poetry.Install(dag.Host().Directory("."))
 
-- `Install(ctx context.Context, src *Directory, dev bool, pythonVersion string) (*Container, error)`
-  - Installs project dependencies
-  - Parameters:
-    - `src`: Project directory
-    - `dev`: Include development dependencies
-    - `pythonVersion`: Python version
-  
-- `Build(ctx context.Context, src *Directory, format string, config map[string]string) (*File, error)`
-  - Builds Python package
-  - Parameters:
-    - `src`: Project directory
-    - `format`: Build format (wheel, sdist)
-    - `config`: Build configuration
-  
-- `Publish(ctx context.Context, src *Directory, repository string, token *Secret) error`
-  - Publishes package to repository
-  - Parameters:
-    - `src`: Project directory
-    - `repository`: Target repository
-    - `token`: Authentication token
+// Run tests
+output, err := poetry.Test(ctx, installed)
+if err != nil {
+    return err
+}
+
+// Build with version
+dist := poetry.BuildWithVersion(installed, "1.0.0")
+```
+
+### Development Workflow
+
+```go
+// Initialize Poetry
+poetry := dag.Poetry()
+
+// Update dependencies
+updated := poetry.Update(dag.Host().Directory("."))
+
+// Lock dependencies
+locked := poetry.Lock(updated)
+
+// Install and test
+output, err := poetry.Test(ctx, locked)
+```
 
 ## Best Practices
 
-1. **Dependency Management**
-   - Use lock files
-   - Pin versions
-   - Separate dev dependencies
+1. **Project Structure**:
+   - Keep `pyproject.toml` in root directory
+   - Use consistent dependency versions
+   - Include comprehensive test suite
 
-2. **Build Configuration**
-   - Use build isolation
-   - Configure Python versions
-   - Manage build dependencies
+2. **Version Management**:
+   - Use semantic versioning
+   - Keep dependencies up to date
+   - Lock dependencies for production
 
-3. **Package Publishing**
-   - Use secure tokens
-   - Verify package contents
-   - Test before publishing
+3. **Testing**:
+   - Write comprehensive tests
+   - Use pytest fixtures
+   - Include coverage reports
 
-4. **Environment Management**
-   - Use virtual environments
-   - Handle Python versions
-   - Manage system dependencies
+## Common Issues
 
-## Troubleshooting
+1. **Installation Problems**:
+   - Check Python version compatibility
+   - Verify dependency conflicts
+   - Validate pyproject.toml syntax
 
-Common issues and solutions:
+2. **Build Issues**:
+   - Check build dependencies
+   - Verify package structure
+   - Validate version format
 
-1. **Installation Issues**
-   ```
-   Error: dependency resolution failed
-   Solution: Check dependency conflicts in pyproject.toml
-   ```
+3. **Test Failures**:
+   - Check test dependencies
+   - Verify test environment
+   - Debug test output
 
-2. **Build Problems**
-   ```
-   Error: build backend failed
-   Solution: Verify build dependencies and configuration
-   ```
+## Contributing
 
-3. **Publishing Errors**
-   ```
-   Error: authentication failed
-   Solution: Check repository credentials and token
-   ```
+Contributions are welcome! Please read our [Contributing Guidelines](../CONTRIBUTING.md) for details on how to submit pull requests.
 
-## Configuration Example
+## License
 
-```toml
-# pyproject.toml
-[tool.poetry]
-name = "my-package"
-version = "0.1.0"
-description = "My Python package"
-authors = ["Author <author@example.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-requests = "^2.28.0"
-
-[tool.poetry.dev-dependencies]
-pytest = "^7.1.0"
-black = "^22.3.0"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-```
-
-## Advanced Usage
-
-### Custom Build Configuration
-
-```go
-func (m *MyModule) CustomBuild(ctx context.Context) (*File, error) {
-    poetry := dag.Poetry().New()
-    
-    // Build with custom configuration
-    return poetry.BuildWithConfig(
-        ctx,
-        dag.Directory("./python-project"),
-        dag.File("./build.toml"),
-        map[string]string{
-            "python-version": "3.9",
-            "optimize": "2",
-        },
-    )
-}
-```
-
-### Multi-Package Management
-
-```go
-func (m *MyModule) ManagePackages(ctx context.Context) error {
-    poetry := dag.Poetry().New()
-    
-    // Manage multiple packages
-    packages := []string{"package1", "package2", "package3"}
-    for _, pkg := range packages {
-        _, err := poetry.Install(
-            ctx,
-            dag.Directory(fmt.Sprintf("./%s", pkg)),
-            false,
-            "3.9",
-        )
-        if err != nil {
-            return err
-        }
-    }
-    
-    return nil
-} 
+This module is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details. 
