@@ -164,35 +164,35 @@ func (m *Python) Publish(ctx context.Context, source *dagger.Directory, token *d
 		container = container.WithExec([]string{"git", "fetch", "--tags"})
 	}
 
-	// Get the next version using semantic-release
-	version, err := container.
-		WithExec([]string{"semantic-release", "version", "--no-commit", "--no-tag"}).
-		Stdout(ctx)
+	// Run semantic-release to determine and set the new version
+	container = container.WithExec([]string{"semantic-release", "version"})
+
+	// Read the version from pyproject.toml using tomli
+	versionCmd := `python3 -c "
+import tomli
+with open('pyproject.toml', 'rb') as f:
+    print(tomli.load(f)['tool']['poetry']['version'])
+"`
+	version, err := container.WithExec([]string{"sh", "-c", versionCmd}).Stdout(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to determine version: %w", err)
+		return fmt.Errorf("failed to read version from pyproject.toml: %w", err)
 	}
 	version = strings.TrimSpace(version)
 
-	// Update version in pyproject.toml
-	container = container.WithExec([]string{"poetry", "version", version})
-
-	// Build the package
+	// Build the package with the new version
 	dist := dag.Poetry().BuildWithVersion(source, version)
 
 	// Publish to PyPI
-	err = dag.Pypi().
-		Publish(ctx, dist, token)
+	err = dag.Pypi().Publish(ctx, dist, token)
 	if err != nil {
 		return fmt.Errorf("failed to publish package: %w", err)
 	}
 
-	// Create and push tag if GitHub token is provided
+	// Create and push git tag if GitHub token is provided
 	if m.githubToken != nil {
-		container = container.WithSecretVariable("GITHUB_TOKEN", m.githubToken)
-		_, err = container.WithExec([]string{"semantic-release", "publish"}).Stdout(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to create and push tag: %w", err)
-		}
+		container = container.
+			WithSecretVariable("GITHUB_TOKEN", m.githubToken).
+			WithExec([]string{"semantic-release", "publish"})
 	}
 
 	return nil
