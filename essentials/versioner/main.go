@@ -9,11 +9,21 @@ import (
 )
 
 // Versioner implements version management for repositories
-type Versioner struct{}
+type Versioner struct {
+	// GitHub token for authentication
+	// +private
+	GitHubToken *dagger.Secret
+}
 
 // New creates a new Versioner instance
-func New() *Versioner {
-	return &Versioner{}
+func New(
+	// GitHub token for authentication
+	// +optional
+	githubToken *dagger.Secret,
+) *Versioner {
+	return &Versioner{
+		GitHubToken: githubToken,
+	}
 }
 
 // BumpVersion creates a new version tag based on the latest tag and commit type
@@ -28,6 +38,24 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 	container = container.WithExec([]string{"git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"}).
 		WithExec([]string{"git", "config", "--global", "user.name", "github-actions[bot]"})
 
+	// Get repository URL from remote
+	repoUrl, err := container.WithExec([]string{
+		"sh", "-c",
+		"git remote get-url origin 2>/dev/null || echo ''",
+	}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting repository URL: %w", err)
+	}
+
+	// If GitHub token is provided, use it to authenticate
+	if m.GitHubToken != nil {
+		repoUrl = strings.TrimSpace(repoUrl)
+		if strings.HasPrefix(repoUrl, "https://github.com/") {
+			repoUrl = strings.Replace(repoUrl, "https://", "https://x-access-token:$GITHUB_TOKEN@", 1)
+			container = container.WithSecretVariable("GITHUB_TOKEN", m.GitHubToken)
+		}
+	}
+
 	// Ensure repository is initialized
 	gitStatus, err := container.WithExec([]string{"sh", "-c", "[ -d .git ] && echo 'true' || echo 'false'"}).Stdout(ctx)
 	if err != nil {
@@ -37,15 +65,16 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 	if strings.TrimSpace(gitStatus) == "false" {
 		container = container.
 			WithExec([]string{"git", "init"}).
-			WithExec([]string{"git", "remote", "add", "origin", "https://<username>:<token>@github.com/<user>/<repo>.git"}).
-			WithExec([]string{"git", "fetch", "origin"}).
+			WithExec([]string{"git", "remote", "add", "origin", repoUrl}).
+			WithExec([]string{"git", "fetch", "--tags", "origin"}).
 			WithExec([]string{"git", "checkout", "-b", "main"}).
 			WithExec([]string{"git", "pull", "--rebase", "origin", "main"}).
 			WithExec([]string{"git", "add", "."}).
 			WithExec([]string{"git", "commit", "-m", "Initial commit"})
 	} else {
-		// Sync with remote branch
-		container = container.WithExec([]string{"git", "fetch", "origin"}).
+		// Sync with remote branch and tags
+		container = container.
+			WithExec([]string{"git", "fetch", "--tags", "origin"}).
 			WithExec([]string{"git", "pull", "--rebase", "origin", "main"})
 	}
 
@@ -127,15 +156,17 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 	}
 
 	// Push branch and ensure sync with remote
-	_, err = container.WithExec([]string{"git", "push", "--set-upstream", "origin", "main"}).Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error pushing branch to remote: %w", err)
-	}
+	if m.GitHubToken != nil {
+		// Push branch and tags to remote
+		_, err = container.WithExec([]string{"git", "push", "--set-upstream", "origin", "main"}).Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("error pushing branch to remote: %w", err)
+		}
 
-	// Push all tags to remote
-	_, err = container.WithExec([]string{"git", "push", "origin", "--tags"}).Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error pushing tags to remote: %w", err)
+		_, err = container.WithExec([]string{"git", "push", "origin", "--tags"}).Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("error pushing tags to remote: %w", err)
+		}
 	}
 
 	if outputVersion {
