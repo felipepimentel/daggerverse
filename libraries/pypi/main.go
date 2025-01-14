@@ -46,7 +46,7 @@ func (m *Pypi) Publish(ctx context.Context, source *dagger.Directory, token *dag
 		WithExec([]string{"ls", "-la"}) // Debug: list files
 
 	// Publish package
-	_, err := container.WithExec([]string{"poetry", "publish", "--skip-existing"}).Stdout(ctx)
+	_, err := container.WithExec([]string{"poetry", "publish"}).Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("error publishing package: %v", err)
 	}
