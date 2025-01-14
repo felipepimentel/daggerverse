@@ -58,14 +58,19 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 		return "", fmt.Errorf("error getting tags: %w", err)
 	}
 
-	// Get the latest commit message
+	// Get the latest commit message and hash
 	commitMsg, err := container.WithExec([]string{
 		"sh", "-c",
-		"git log -1 --pretty=%B",
+		"git log -1 --pretty=%B%n%H",
 	}).Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting commit message: %w", err)
 	}
+
+	// Split commit message and hash
+	parts := strings.Split(strings.TrimSpace(commitMsg), "\n")
+	commitHash := parts[len(parts)-1]
+	commitMsg = strings.Join(parts[:len(parts)-1], "\n")
 
 	// Find the highest version among all tags
 	var major, minor, patch int
@@ -82,6 +87,18 @@ func (m *Versioner) BumpVersion(ctx context.Context, source *dagger.Directory, o
 				if m > major || (m == major && n > minor) || (m == major && n == minor && p > patch) {
 					major, minor, patch = m, n, p
 				}
+			}
+		}
+
+		// Check if the latest tag points to the current commit
+		for _, tag := range tags {
+			tagHash, err := container.WithExec([]string{
+				"git", "rev-parse", tag,
+			}).Stdout(ctx)
+			if err == nil && strings.TrimSpace(tagHash) == commitHash {
+				// This commit already has a tag, increment patch version
+				patch++
+				break
 			}
 		}
 
