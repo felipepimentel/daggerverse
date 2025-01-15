@@ -1,0 +1,170 @@
+name: Reusable Documentation Workflow
+
+on:
+  workflow_call:
+    inputs:
+      generator:
+        description: 'Documentation generator to use (just-the-docs, mkdocs)'
+        required: true
+        type: string
+      ruby_version:
+        description: 'Ruby version for Just The Docs'
+        required: false
+        type: string
+        default: '3.3'
+      python_version:
+        description: 'Python version for MkDocs'
+        required: false
+        type: string
+        default: '3.11'
+      source_dir:
+        description: 'Directory containing documentation source'
+        required: false
+        type: string
+        default: 'docs'
+      base_url:
+        description: 'Base URL for the documentation'
+        required: false
+        type: string
+        default: ''
+      strict_mode:
+        description: 'Enable strict mode (for MkDocs)'
+        required: false
+        type: boolean
+        default: true
+      minify:
+        description: 'Enable HTML minification'
+        required: false
+        type: boolean
+        default: true
+      git_revision_date:
+        description: 'Include git revision date (for MkDocs)'
+        required: false
+        type: boolean
+        default: true
+      environment:
+        description: 'GitHub environment to deploy to'
+        required: false
+        type: string
+        default: 'github-pages'
+    secrets:
+      token:
+        description: 'GitHub token for deployment'
+        required: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-just-the-docs:
+    if: inputs.generator == 'just-the-docs'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby_version }}
+          bundler-cache: true
+          working-directory: ${{ inputs.source_dir }}
+          cache-version: 1
+      
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      
+      - name: Build with Jekyll
+        run: |
+          cd ${{ inputs.source_dir }}
+          bundle config set --local path 'vendor/bundle'
+          bundle install
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}" --trace
+        env:
+          JEKYLL_ENV: production
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ inputs.source_dir }}/_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.token }}
+
+  build-mkdocs:
+    if: inputs.generator == 'mkdocs'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Dagger CLI
+        uses: dagger/dagger-for-github@v5
+        with:
+          version: "0.9.3"
+
+      - name: Validate MkDocs Configuration
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
+        run: |
+          if [ ! -f "${{ inputs.source_dir }}/mkdocs.yml" ]; then
+            echo "Error: mkdocs.yml not found in ${{ inputs.source_dir }}"
+            exit 1
+          fi
+
+          if [ ! -d "${{ inputs.source_dir }}/docs" ]; then
+            echo "Error: docs directory not found in ${{ inputs.source_dir }}"
+            exit 1
+          fi
+
+      - name: Build Documentation
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
+        run: |
+          cat << EOF > config.json
+          {
+            "source": "${{ inputs.source_dir }}",
+            "pythonVersion": "${{ inputs.python_version }}",
+            "baseURL": "${{ inputs.base_url }}",
+            "strict": ${{ inputs.strict_mode }},
+            "minify": ${{ inputs.minify }},
+            "gitRevisionDate": ${{ inputs.git_revision_date }}
+          }
+          EOF
+
+          dagger call --progress=plain \
+            --source "${{ inputs.source_dir }}" \
+            build \
+            --config config.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.token }} 

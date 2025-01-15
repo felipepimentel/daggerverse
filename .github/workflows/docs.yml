@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
+      - ".github/workflows/reusable-docs.yml"
 
 permissions:
   contents: read
@@ -17,45 +18,12 @@ concurrency:
   cancel-in-progress: true
   
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: true
-          working-directory: docs
-          cache-version: 1
-      
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-      
-      - name: Build with Jekyll
-        run: |
-          cd docs
-          bundle config set --local path 'vendor/bundle'
-          bundle install
-          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}" --trace
-        env:
-          JEKYLL_ENV: production
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/_site
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4 
+  docs:
+    uses: ./.github/workflows/reusable-docs.yml
+    with:
+      generator: just-the-docs
+      source_dir: docs
+      ruby_version: "3.3"
+      environment: github-pages
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }} 
