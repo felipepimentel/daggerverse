@@ -7,7 +7,7 @@ on:
         description: 'Version of Dagger to use'
         required: false
         type: string
-        default: '0.15.1'
+        default: '0.15.2'
       source_path:
         description: 'Path to n8n configuration files'
         required: false

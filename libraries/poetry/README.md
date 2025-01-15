@@ -59,7 +59,7 @@ locked := poetry.Lock(dag.Host().Directory("."))
 
 ## Requirements
 
-- Dagger v0.15.1
+- Dagger v0.15.2
 - Go 1.23.4
 - Python project with Poetry configuration
 

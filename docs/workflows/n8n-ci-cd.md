@@ -60,7 +60,7 @@ jobs:
   deploy-n8n:
     uses: felipepimentel/daggerverse/.github/workflows/reusable-n8n-ci-cd.yml@main
     with:
-      dagger_version: "0.15.1"
+      dagger_version: "0.15.2"
       region: "fra1"
       app_name: "n8n-production"
       env_vars: |
@@ -81,7 +81,7 @@ jobs:
 
 | Name | Description | Required | Default | Example Values |
 |------|-------------|----------|---------|----------------|
-| `dagger_version` | Version of Dagger to use | No | `0.15.1` | `0.15.1`, `0.15.0` |
+| `dagger_version` | Version of Dagger to use | No | `0.15.2` | `0.15.2`, `0.15.0` |
 | `region` | DigitalOcean region for deployment | No | `nyc` | `nyc`, `fra1`, `sgp1` |
 | `app_name` | Name of the n8n application | No | `n8n` | `n8n-prod`, `n8n-staging` |
 | `env_vars` | JSON string of environment variables | No | Basic auth config | See environment variables section |

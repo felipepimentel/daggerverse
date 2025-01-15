@@ -249,7 +249,7 @@ Examples:
 
    - Keep workflows modular and reusable.
    - Ensure pipelines are well-documented and tested.
-   - **Version Requirements:** Ensure the Dagger version is `0.15.1` and Go version is `1.23.2`. Validate this in all configurations.
+   - **Version Requirements:** Ensure the Dagger version is `0.15.2` and Go version is `1.23.2`. Validate this in all configurations.
 
 3. **Documentation:**
    - Update README and module-specific documentation as necessary.

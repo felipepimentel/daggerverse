@@ -3,6 +3,7 @@
   "sdk": "go",
   "dependencies": [],
   "source": ".",
+  "engineVersion": "v0.15.2",
   "description": "A powerful MkDocs module for building and deploying documentation with Material theme support",
   "repository": "github.com/felipepimentel/daggerverse",
   "license": "MIT"
