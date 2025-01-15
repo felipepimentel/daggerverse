@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       generator:
-        description: 'Documentation generator to use (just-the-docs, mkdocs)'
+        description: 'Documentation generator to use (just-the-docs, mkdocs, sphinx)'
         required: true
         type: string
       ruby_version:
@@ -13,10 +13,10 @@ on:
         type: string
         default: '3.3'
       python_version:
-        description: 'Python version for MkDocs'
+        description: 'Python version for MkDocs/Sphinx'
         required: false
         type: string
-        default: '3.11'
+        default: '3.12'
       source_dir:
         description: 'Directory containing documentation source'
         required: false
@@ -47,6 +47,21 @@ on:
         required: false
         type: string
         default: 'github-pages'
+      poetry_version:
+        description: 'Poetry version for Sphinx'
+        required: false
+        type: string
+        default: 'latest'
+      poetry_virtualenvs_in_project:
+        description: 'Create virtualenvs in project directory for Poetry'
+        required: false
+        type: boolean
+        default: true
+      poetry_groups:
+        description: 'Poetry dependency groups to install'
+        required: false
+        type: string
+        default: 'dev,docs'
     secrets:
       token:
         description: 'GitHub token for deployment'
@@ -163,6 +178,50 @@ jobs:
         with:
           path: ./site
 
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.token }}
+
+  build-sphinx:
+    if: inputs.generator == 'sphinx'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ inputs.poetry_version }}
+          virtualenvs-create: true
+          virtualenvs-in-project: ${{ inputs.poetry_virtualenvs_in_project }}
+          
+      - name: Install dependencies
+        run: poetry install --with ${{ inputs.poetry_groups }}
+          
+      - name: Build documentation
+        run: |
+          cd ${{ inputs.source_dir }}
+          poetry run make html
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ inputs.source_dir }}/build/html
+          
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
