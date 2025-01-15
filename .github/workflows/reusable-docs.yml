@@ -158,6 +158,7 @@ jobs:
         run: |
           poetry install --with ${{ inputs.poetry_groups }}
           cd ${{ inputs.source_dir }}
+          poetry run pip install sphinx sphinx-rtd-theme
           poetry run make html
       
       # Common Steps
