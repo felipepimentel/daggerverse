@@ -117,7 +117,7 @@ jobs:
       - name: Install Dagger CLI
         uses: dagger/dagger-for-github@v5
         with:
-          version: "0.9.3"
+          version: "0.15.2"
       
       - name: Build and Push Package
         env:
