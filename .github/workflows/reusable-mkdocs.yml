@@ -54,6 +54,8 @@ permissions:
 
 jobs:
   build-and-deploy:
+    # Ensure this job only runs when called by another workflow
+    if: github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
