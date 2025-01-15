@@ -1,4 +1,6 @@
 name: Reusable MkDocs Workflow
+
+# Only allow this workflow to be called by other workflows
 on:
   workflow_call:
     inputs:
@@ -54,8 +56,6 @@ permissions:
 
 jobs:
   build-and-deploy:
-    # Ensure this job only runs when called by another workflow
-    if: github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
