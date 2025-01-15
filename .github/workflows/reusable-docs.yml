@@ -77,8 +77,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-just-the-docs:
-    if: inputs.generator == 'just-the-docs'
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
@@ -86,8 +85,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ inputs.generator == 'mkdocs' && '0' || '1' }}
       
+      # Just The Docs Setup
       - name: Setup Ruby
+        if: inputs.generator == 'just-the-docs'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ inputs.ruby_version }}
@@ -95,11 +98,32 @@ jobs:
           working-directory: ${{ inputs.source_dir }}
           cache-version: 1
       
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
+      # Python Setup for MkDocs/Sphinx
+      - name: Set up Python
+        if: inputs.generator == 'mkdocs' || inputs.generator == 'sphinx'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
       
+      # MkDocs Setup
+      - name: Install Dagger CLI
+        if: inputs.generator == 'mkdocs'
+        uses: dagger/dagger-for-github@v5
+        with:
+          version: "0.9.3"
+      
+      # Sphinx Setup
+      - name: Install Poetry
+        if: inputs.generator == 'sphinx'
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ inputs.poetry_version }}
+          virtualenvs-create: true
+          virtualenvs-in-project: ${{ inputs.poetry_virtualenvs_in_project }}
+      
+      # Build Steps
       - name: Build with Jekyll
+        if: inputs.generator == 'just-the-docs'
         run: |
           cd ${{ inputs.source_dir }}
           bundle config set --local path 'vendor/bundle'
@@ -108,49 +132,8 @@ jobs:
         env:
           JEKYLL_ENV: production
       
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ inputs.source_dir }}/_site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          token: ${{ secrets.token }}
-
-  build-mkdocs:
-    if: inputs.generator == 'mkdocs'
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Dagger CLI
-        uses: dagger/dagger-for-github@v5
-        with:
-          version: "0.9.3"
-
-      - name: Validate MkDocs Configuration
-        env:
-          GITHUB_TOKEN: ${{ secrets.token }}
-        run: |
-          if [ ! -f "${{ inputs.source_dir }}/mkdocs.yml" ]; then
-            echo "Error: mkdocs.yml not found in ${{ inputs.source_dir }}"
-            exit 1
-          fi
-
-          if [ ! -d "${{ inputs.source_dir }}/docs" ]; then
-            echo "Error: docs directory not found in ${{ inputs.source_dir }}"
-            exit 1
-          fi
-
-      - name: Build Documentation
+      - name: Build with MkDocs
+        if: inputs.generator == 'mkdocs'
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
@@ -169,59 +152,28 @@ jobs:
             --source "${{ inputs.source_dir }}" \
             build \
             --config config.json
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          token: ${{ secrets.token }}
-
-  build-sphinx:
-    if: inputs.generator == 'sphinx'
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python_version }}
-          
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ inputs.poetry_version }}
-          virtualenvs-create: true
-          virtualenvs-in-project: ${{ inputs.poetry_virtualenvs_in_project }}
-          
-      - name: Install dependencies
-        run: poetry install --with ${{ inputs.poetry_groups }}
-          
-      - name: Build documentation
+      - name: Build with Sphinx
+        if: inputs.generator == 'sphinx'
         run: |
+          poetry install --with ${{ inputs.poetry_groups }}
           cd ${{ inputs.source_dir }}
           poetry run make html
-          
+      
+      # Common Steps
       - name: Setup Pages
         uses: actions/configure-pages@v4
-          
+      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ inputs.source_dir }}/build/html
-          
+          path: >-
+            ${{
+              inputs.generator == 'just-the-docs' && format('{0}/_site', inputs.source_dir) ||
+              inputs.generator == 'mkdocs' && './site' ||
+              inputs.generator == 'sphinx' && format('{0}/build/html', inputs.source_dir)
+            }}
+      
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
