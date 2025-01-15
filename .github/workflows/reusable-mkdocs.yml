@@ -45,7 +45,7 @@ on:
         type: string
         default: 'github-pages'
     secrets:
-      github_token:
+      token:
         description: 'GitHub token for deployment'
         required: true
 
@@ -74,7 +74,7 @@ jobs:
 
       - name: Validate MkDocs Configuration
         env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+          GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # Validate mkdocs.yml exists
           if [ ! -f "${{ inputs.source_dir }}/mkdocs.yml" ]; then
@@ -90,7 +90,7 @@ jobs:
 
       - name: Build and Deploy Documentation
         env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+          GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # Create Dagger configuration
           cat << EOF > config.json
@@ -123,4 +123,4 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          token: ${{ secrets.github_token }} 
+          token: ${{ secrets.token }} 
