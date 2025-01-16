@@ -1,4 +1,4 @@
-module github.com/felipepimentel/daggerverse/libraries/docker
+module github.com/felipepimentel/daggerverse/essentials/dig
 
 go 1.22.7
 

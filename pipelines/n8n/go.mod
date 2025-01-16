@@ -7,8 +7,6 @@ toolchain go1.23.4
 require (
 	github.com/99designs/gqlgen v0.17.57
 	github.com/Khan/genqlient v0.7.0
-	github.com/felipepimentel/daggerverse/essentials/ssh v0.0.0
-	github.com/felipepimentel/daggerverse/libraries/digitalocean v0.0.0
 	github.com/vektah/gqlparser/v2 v2.5.20
 	go.opentelemetry.io/otel v1.33.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.9.0
@@ -46,6 +44,10 @@ require (
 	google.golang.org/protobuf v1.36.1 // indirect
 )
 
+replace github.com/felipepimentel/daggerverse/essentials/ssh => ../../essentials/ssh
+
+replace github.com/felipepimentel/daggerverse/libraries/digitalocean => ../../libraries/digitalocean
+
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88
 
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.3.0
@@ -53,7 +55,3 @@ replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opente
 replace go.opentelemetry.io/otel/log => go.opentelemetry.io/otel/log v0.3.0
 
 replace go.opentelemetry.io/otel/sdk/log => go.opentelemetry.io/otel/sdk/log v0.3.0
-
-replace github.com/felipepimentel/daggerverse/essentials/ssh => ../../essentials/ssh
-
-replace github.com/felipepimentel/daggerverse/libraries/digitalocean => ../../libraries/digitalocean

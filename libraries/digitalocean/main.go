@@ -4,355 +4,323 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"dagger/digitalocean/internal/dagger"
-
-	"github.com/digitalocean/godo"
-	"golang.org/x/oauth2"
+	"github.com/felipepimentel/daggerverse/libraries/digitalocean/internal/dagger"
 )
 
-// Digitalocean provides methods for interacting with DigitalOcean services
-type Digitalocean struct {
-	Token string // DigitalOcean API token
+// DigitalOcean provides functionality for managing DigitalOcean resources
+type DigitalOcean struct {
+	token  *dagger.Secret
 }
 
-// EnvVar represents an environment variable
-type EnvVar struct {
-	Key   string
-	Value string
+// SSHKeyConfig holds configuration for SSH key operations
+type SSHKeyConfig struct {
+	Name      string
+	PublicKey string
 }
 
-// AppConfig represents configuration for a DigitalOcean app
-type AppConfig struct {
-	Name             string
-	Region           string
-	InstanceSize     string
-	InstanceCount    int64
-	Container        Container
-	EnvVars         []EnvVar
-	HealthCheckPath  string
-	HTTPPort        int
+// RegistryConfig holds configuration for container registry operations
+type RegistryConfig struct {
+	Name string
 }
 
-// N8NAppConfig represents specific configuration for n8n deployment
-type N8NAppConfig struct {
-	AppConfig
-	DatabaseURL string
-	WebhookURL  string
-	EncKey      string
+// DropletConfig holds configuration for creating a droplet
+type DropletConfig struct {
+	Name       string
+	Region     string
+	Size       string
+	Image      string
+	SSHKeyID   string
+	Monitoring bool
+	IPv6       bool
+	Tags       []string
 }
 
-// Container represents a Dagger container
-type Container = *dagger.Container
-
-// Secret represents a Dagger secret
-type Secret = *dagger.Secret
-
-// New creates a new Digitalocean client
-func New() *Digitalocean {
-	return &Digitalocean{}
+// DNSConfig holds configuration for managing DNS records
+type DNSConfig struct {
+	Domain   string
+	Type     string
+	Name     string
+	Value    string
+	TTL      int
+	Weight   int
+	Port     int
+	Flag     int
+	Tag      string
+	Priority int
 }
 
-// WithToken sets the DigitalOcean API token
-func (d *Digitalocean) WithToken(token string) *Digitalocean {
-	d.Token = token
-	return d
-}
-
-// getClient creates a new DigitalOcean API client
-func (d *Digitalocean) getClient() (*godo.Client, error) {
-	if d.Token == "" {
-		return nil, fmt.Errorf("DigitalOcean API token is required")
+// New creates a new instance of the DigitalOcean module
+func New(token *dagger.Secret) *DigitalOcean {
+	return &DigitalOcean{
+		token: token,
 	}
-
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: d.Token})
-	oauthClient := oauth2.NewClient(context.Background(), tokenSource)
-	return godo.NewClient(oauthClient), nil
 }
 
-// CreateDroplet creates a new DigitalOcean droplet
-func (d *Digitalocean) CreateDroplet(
-	ctx context.Context,
-	name string,
-	region string,
-	size string,
-	image string,
-	sshKeys []string,
-) (*dagger.Container, error) {
-	client, err := d.getClient()
-	if err != nil {
-		return nil, err
-	}
+// SSH Key Management
 
-	createRequest := &godo.DropletCreateRequest{
-		Name:    name,
-		Region:  region,
-		Size:    size,
-		Image:   godo.DropletCreateImage{Slug: image},
-		SSHKeys: make([]godo.DropletCreateSSHKey, len(sshKeys)),
-	}
-
-	for i, key := range sshKeys {
-		createRequest.SSHKeys[i] = godo.DropletCreateSSHKey{Fingerprint: key}
-	}
-
-	droplet, _, err := client.Droplets.Create(ctx, createRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return a container with DigitalOcean CLI configured
+// CreateSSHKey creates a new SSH key
+func (do *DigitalOcean) CreateSSHKey(ctx context.Context, config SSHKeyConfig) (*dagger.Container, error) {
 	return dag.Container().
 		From("digitalocean/doctl:latest").
-		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", d.Token).
-		WithExec([]string{"compute", "droplet", "get", fmt.Sprintf("%d", droplet.ID), "--format", "json"}), nil
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"ssh-key",
+			"create",
+			config.Name,
+			"--public-key", config.PublicKey,
+		}), nil
 }
 
-// ListDroplets returns a list of all droplets in the account
-func (d *Digitalocean) ListDroplets(ctx context.Context) (*dagger.Container, error) {
+// ListSSHKeys lists all SSH keys
+func (do *DigitalOcean) ListSSHKeys(ctx context.Context, format string) (*dagger.Container, error) {
+	args := []string{"compute", "ssh-key", "list"}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	if format == "ID" {
+		args = append(args, "--no-header")
+	}
+	
 	return dag.Container().
 		From("digitalocean/doctl:latest").
-		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", d.Token).
-		WithExec([]string{"compute", "droplet", "list", "--format", "json"}), nil
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec(args), nil
 }
 
-// DeleteDroplet deletes a DigitalOcean droplet by ID
-func (d *Digitalocean) DeleteDroplet(ctx context.Context, dropletID int) error {
-	client, err := d.getClient()
-	if err != nil {
-		return err
-	}
+// Registry Management
 
-	_, err = client.Droplets.Delete(ctx, dropletID)
+// CreateRegistry creates a new container registry
+func (do *DigitalOcean) CreateRegistry(ctx context.Context, config RegistryConfig) (*dagger.Container, error) {
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"registry",
+			"create",
+			config.Name,
+		}), nil
+}
+
+// GetRegistry gets registry details
+func (do *DigitalOcean) GetRegistry(ctx context.Context) (*dagger.Container, error) {
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"registry",
+			"get",
+		}), nil
+}
+
+// ListRegistryTags lists all tags in a registry repository
+func (do *DigitalOcean) ListRegistryTags(ctx context.Context, registry string) (*dagger.Container, error) {
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"registry",
+			"repository",
+			"list-tags",
+			registry,
+		}), nil
+}
+
+// DeleteRegistry deletes a container registry
+func (do *DigitalOcean) DeleteRegistry(ctx context.Context, name string) error {
+	_, err := dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"registry",
+			"delete",
+			name,
+			"--force",
+		}).
+		Stdout(ctx)
 	return err
 }
 
-// GetDropletIP returns the public IP of a droplet
-func (d *Digitalocean) GetDropletIP(ctx context.Context, dropletID int) (string, error) {
-	client, err := d.getClient()
-	if err != nil {
-		return "", err
+// Droplet Management
+
+// CreateDroplet creates a new droplet with the given configuration
+func (do *DigitalOcean) CreateDroplet(ctx context.Context, config DropletConfig) (*dagger.Container, error) {
+	if config.Name == "" || config.Region == "" || config.Size == "" || config.Image == "" {
+		return nil, fmt.Errorf("missing required droplet configuration")
 	}
 
-	droplet, _, err := client.Droplets.Get(ctx, dropletID)
-	if err != nil {
-		return "", err
+	args := []string{
+		"compute",
+		"droplet",
+		"create",
+		config.Name,
+		"--region", config.Region,
+		"--size", config.Size,
+		"--image", config.Image,
+		"--ssh-keys", config.SSHKeyID,
+		"--wait",
+		"--format", "ID,Name,PublicIPv4",
 	}
 
-	for _, network := range droplet.Networks.V4 {
-		if network.Type == "public" {
-			return network.IPAddress, nil
+	if config.Monitoring {
+		args = append(args, "--enable-monitoring")
+	}
+
+	if config.IPv6 {
+		args = append(args, "--enable-ipv6")
+	}
+
+	if len(config.Tags) > 0 {
+		args = append(args, "--tag-names", fmt.Sprintf("[%s]", config.Tags[0]))
+		for _, tag := range config.Tags[1:] {
+			args[len(args)-1] = fmt.Sprintf("%s,%s", args[len(args)-1], tag)
 		}
 	}
 
-	return "", fmt.Errorf("no public IP found for droplet %d", dropletID)
-}
-
-// DeployApp deploys a container as a DigitalOcean app with more configuration options
-func (d *Digitalocean) DeployApp(ctx context.Context, config AppConfig) (*dagger.Container, error) {
-	client, err := d.getClient()
-	if err != nil {
-		return nil, err
-	}
-
-	if config.InstanceSize == "" {
-		config.InstanceSize = "basic-xxs"
-	}
-	if config.InstanceCount == 0 {
-		config.InstanceCount = 1
-	}
-	if config.HTTPPort == 0 {
-		config.HTTPPort = 80
-	}
-
-	// Convert environment variables to EnvVar format
-	envVars := make([]*godo.AppVariableDefinition, 0, len(config.EnvVars))
-	for _, env := range config.EnvVars {
-		envVars = append(envVars, &godo.AppVariableDefinition{
-			Key:   env.Key,
-			Value: env.Value,
-			Type:  godo.AppVariableType_General,
-			Scope: godo.AppVariableScope_RunTime,
-		})
-	}
-
-	// Create app spec
-	spec := &godo.AppSpec{
-		Name:   config.Name,
-		Region: config.Region,
-		Services: []*godo.AppServiceSpec{
-			{
-				Name:             config.Name,
-				InstanceSizeSlug: config.InstanceSize,
-				InstanceCount:    config.InstanceCount,
-				Image: &godo.ImageSourceSpec{
-					Registry:   "registry.digitalocean.com",
-					Repository: config.Name,
-					Tag:       "latest",
-				},
-				HealthCheck: &godo.AppServiceSpecHealthCheck{
-					Path: config.HealthCheckPath,
-				},
-				Envs: envVars,
-			},
-		},
-	}
-
-	// Create the app
-	app, _, err := client.Apps.Create(ctx, &godo.AppCreateRequest{Spec: spec})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create app: %w", err)
-	}
-
-	// Create a secret for the token
-	secret := dag.SetSecret("do_token", d.Token)
-
-	// Push container to DO registry
-	registryContainer := config.Container.WithRegistryAuth(
-		"registry.digitalocean.com",
-		"",
-		secret,
-	)
-
-	_, err = registryContainer.Publish(ctx, fmt.Sprintf("registry.digitalocean.com/%s:latest", config.Name))
-	if err != nil {
-		return nil, fmt.Errorf("failed to push container: %w", err)
-	}
-
-	// Return container with app info
 	return dag.Container().
 		From("digitalocean/doctl:latest").
-		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", d.Token).
-		WithExec([]string{"apps", "get", app.ID, "--format", "json"}), nil
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec(args), nil
 }
 
-// WaitForAppDeployment waits for a DigitalOcean app deployment to complete
-func (d *Digitalocean) WaitForAppDeployment(ctx context.Context, appID string) error {
-	client, err := d.getClient()
-	if err != nil {
-		return err
+// GetDroplet retrieves information about a droplet by name
+func (do *DigitalOcean) GetDroplet(ctx context.Context, name string, format string) (*dagger.Container, error) {
+	args := []string{
+		"compute",
+		"droplet",
+		"get",
+		name,
+	}
+	
+	if format != "" {
+		args = append(args, "--format", format)
+		if format == "PublicIPv4" {
+			args = append(args, "--no-header")
+		}
 	}
 
-	for {
-		app, _, err := client.Apps.Get(ctx, appID)
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec(args), nil
+}
+
+// DeleteDroplet deletes a droplet by name
+func (do *DigitalOcean) DeleteDroplet(ctx context.Context, name string) error {
+	_, err := dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"droplet",
+			"delete",
+			name,
+			"--force",
+		}).
+		Stdout(ctx)
+	return err
+}
+
+// DNS Management
+
+// CreateDNSRecord creates a new DNS record
+func (do *DigitalOcean) CreateDNSRecord(ctx context.Context, config DNSConfig) error {
+	args := []string{
+		"compute",
+		"domain",
+		"records",
+		"create",
+		config.Domain,
+		"--record-type", config.Type,
+		"--record-name", config.Name,
+		"--record-data", config.Value,
+	}
+
+	if config.TTL > 0 {
+		args = append(args, "--record-ttl", fmt.Sprintf("%d", config.TTL))
+	}
+
+	if config.Priority > 0 {
+		args = append(args, "--record-priority", fmt.Sprintf("%d", config.Priority))
+	}
+
+	_, err := dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec(args).
+		Stdout(ctx)
+	return err
+}
+
+// ListDNSRecords lists all DNS records for a domain
+func (do *DigitalOcean) ListDNSRecords(ctx context.Context, domain string) (*dagger.Container, error) {
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"domain",
+			"records",
+			"list",
+			domain,
+		}), nil
+}
+
+// DeleteDNSRecord deletes a DNS record
+func (do *DigitalOcean) DeleteDNSRecord(ctx context.Context, domain string, recordID string) error {
+	_, err := dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"domain",
+			"records",
+			"delete",
+			domain,
+			recordID,
+			"--force",
+		}).
+		Stdout(ctx)
+	return err
+}
+
+// Utility Functions
+
+// WaitForDroplet waits for a droplet to reach the desired status
+func (do *DigitalOcean) WaitForDroplet(ctx context.Context, name string, status string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		container, err := do.GetDroplet(ctx, name, "Status")
 		if err != nil {
 			return err
 		}
 
-		if app.ActiveDeployment != nil && app.ActiveDeployment.Phase == "ACTIVE" {
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return err
+		}
+
+		if output == status {
 			return nil
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			// Continue polling
-		}
+		time.Sleep(10 * time.Second)
 	}
+
+	return fmt.Errorf("timeout waiting for droplet %s to reach status %s", name, status)
 }
 
-// GetAppURL returns the URL of a deployed app
-func (d *Digitalocean) GetAppURL(ctx context.Context, appID string) (string, error) {
-	client, err := d.getClient()
-	if err != nil {
-		return "", err
-	}
-
-	app, _, err := client.Apps.Get(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-
-	if app.DefaultIngress != "" {
-		return app.DefaultIngress, nil
-	}
-
-	return "", fmt.Errorf("no URL found for app %s", appID)
-}
-
-// DeployN8N deploys n8n as a DigitalOcean app with specific configurations
-func (d *Digitalocean) DeployN8N(ctx context.Context, config N8NAppConfig) (*dagger.Container, error) {
-	if config.InstanceSize == "" {
-		config.InstanceSize = "professional-xs" // Recommended size for n8n
-	}
-	if config.Region == "" {
-		config.Region = "nyc1" // Default region
-	}
-	if config.HTTPPort == 0 {
-		config.HTTPPort = 5678 // Default n8n port
-	}
-
-	// Initialize environment variables slice if nil
-	if config.EnvVars == nil {
-		config.EnvVars = make([]EnvVar, 0)
-	}
-	
-	// Add n8n-specific environment variables
-	config.EnvVars = append(config.EnvVars,
-		EnvVar{Key: "N8N_PORT", Value: fmt.Sprintf("%d", config.HTTPPort)},
-		EnvVar{Key: "N8N_PROTOCOL", Value: "https"},
-		EnvVar{Key: "NODE_ENV", Value: "production"},
-	)
-	
-	if config.DatabaseURL != "" {
-		config.EnvVars = append(config.EnvVars,
-			EnvVar{Key: "DB_TYPE", Value: "postgresdb"},
-			EnvVar{Key: "DB_POSTGRESDB_DATABASE", Value: config.DatabaseURL},
-		)
-	}
-	
-	if config.WebhookURL != "" {
-		config.EnvVars = append(config.EnvVars,
-			EnvVar{Key: "WEBHOOK_URL", Value: config.WebhookURL},
-		)
-	}
-	
-	if config.EncKey != "" {
-		config.EnvVars = append(config.EnvVars,
-			EnvVar{Key: "N8N_ENCRYPTION_KEY", Value: config.EncKey},
-		)
-	}
-
-	// Set health check path for n8n
-	config.HealthCheckPath = "/healthz"
-
-	// Deploy using the base app deployment method
-	return d.DeployApp(ctx, config.AppConfig)
-}
-
-// N8NAppStatus represents the status of an n8n app deployment
-type N8NAppStatus struct {
-	Status string
-	URL    string
-}
-
-// GetN8NAppStatus returns the status and URL of an n8n app deployment
-func (d *Digitalocean) GetN8NAppStatus(ctx context.Context, appID string) (*N8NAppStatus, error) {
-	client, err := d.getClient()
-	if err != nil {
-		return nil, err
-	}
-
-	app, _, err := client.Apps.Get(ctx, appID)
-	if err != nil {
-		return nil, err
-	}
-
-	if app.ActiveDeployment == nil {
-		return &N8NAppStatus{
-			Status: "NO_DEPLOYMENT",
-			URL:    "",
-		}, nil
-	}
-
-	var appURL string
-	if len(app.DefaultIngress) > 0 {
-		appURL = fmt.Sprintf("https://%s", app.DefaultIngress)
-	}
-
-	return &N8NAppStatus{
-		Status: string(app.ActiveDeployment.Phase),
-		URL:    appURL,
-	}, nil
+// ListDroplets lists all droplets in the account
+func (do *DigitalOcean) ListDroplets(ctx context.Context) (*dagger.Container, error) {
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"droplet",
+			"list",
+			"--format", "ID,Name,PublicIPv4,Status",
+		}), nil
 }

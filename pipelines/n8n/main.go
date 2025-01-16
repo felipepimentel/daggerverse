@@ -49,14 +49,6 @@ type N8N struct {
 	sshKey   *dagger.Secret
 }
 
-// dropletInfo represents information about a DigitalOcean droplet
-type dropletInfo struct {
-	ID      string
-	Name    string
-	IPv4    string
-	Status  string
-}
-
 // New creates a new instance of the N8N pipeline with default values
 func New(domain, subdomain, sshKeyName string) *N8N {
 	return &N8N{
@@ -136,25 +128,25 @@ func (n *N8N) WithRegistryConfig(name string) *N8N {
 }
 
 // GetStatus returns the status of the n8n deployment
-func (n *N8N) GetStatus(ctx context.Context) (*dropletInfo, error) {
-	container := n.client.Container().
+func (n *N8N) GetStatus(ctx context.Context) (string, error) {
+	dropletName := fmt.Sprintf("%s-%s", n.Subdomain, n.Domain)
+
+	// Get droplet info using DigitalOcean module
+	container := dag.Container().
 		From("digitalocean/doctl:latest").
 		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", n.doToken).
 		WithExec([]string{
 			"compute", "droplet", "get",
-			fmt.Sprintf("%s-%s", n.Subdomain, n.Domain),
+			dropletName,
 			"--format", "json",
 		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get droplet status: %w", err)
+		return "", fmt.Errorf("failed to get droplet status: %w", err)
 	}
 
-	return &dropletInfo{
-		Name:   fmt.Sprintf("%s-%s", n.Subdomain, n.Domain),
-		Status: output,
-	}, nil
+	return output, nil
 }
 
 // GetURL returns the URL of the n8n instance
@@ -755,7 +747,7 @@ func (n *N8N) Cleanup(ctx context.Context) error {
 	}
 
 	// Step 3: Delete droplet
-	if info != nil {
+	if info != "" {
 		container = n.client.Container().
 			From("digitalocean/doctl:latest").
 			WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", n.doToken).

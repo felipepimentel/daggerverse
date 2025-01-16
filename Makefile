@@ -7,21 +7,16 @@ LANGUAGE_MODULES := $(shell if [ -d languages ]; then find languages -name go.mo
 PIPELINE_MODULES := $(shell find pipelines -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
 
 # Colors for pretty output
-GREEN  := \033[32m
-YELLOW := \033[33m
-WHITE  := \033[37m
-RESET  := \033[0m
-RED    := \033[31m
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
+BLUE   := $(shell tput -Txterm setaf 4)
+RESET  := $(shell tput -Txterm sgr0)
 
 # Separator for visual clarity
 define print_separator
-	@echo "${WHITE}"; \
-	printf '=%.0s' {1..80}; \
-	echo "${RESET}"; \
-	echo "${GREEN}$$1${RESET}"; \
-	echo "${WHITE}"; \
-	printf '=%.0s' {1..80}; \
-	echo "${RESET}"
+	@echo "${BLUE}----------------------------------------${RESET}"
+	@echo "${BLUE}>>> $(1)${RESET}"
+	@echo "${BLUE}----------------------------------------${RESET}"
 endef
 
 # Variables to store development results
@@ -88,20 +83,8 @@ check-module:
 
 .PHONY: help
 help: ## Show this help
-	@echo ''
-	@echo 'Usage:'
-	@echo '  make <target> [MODULE=<module>]'
-	@echo ''
-	@echo 'Available modules by category:'
-	@echo "${GREEN}Essential modules:${RESET}"
-	@echo "$(ESSENTIAL_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
-	@echo "${GREEN}Language modules:${RESET}"
-	@echo "$(LANGUAGE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
-	@echo "${GREEN}Pipeline modules:${RESET}"
-	@echo "$(PIPELINE_MODULES)" | tr ' ' '\n' | sed 's/^/  - /'
-	@echo ''
-	@echo 'Targets:'
-	@awk 'BEGIN {FS = ":.*?## "}; /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
+	@echo "${BLUE}Available targets:${RESET}"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  ${YELLOW}%-20s${RESET} %s\n", $$1, $$2}'
 
 .PHONY: clean
 clean: check-deps ## Clean generated files and dependencies (MODULE=<module> for specific module)
@@ -130,20 +113,18 @@ tidy: check-deps ## Run go mod tidy (MODULE=<module> for specific module)
 	fi
 
 .PHONY: develop
-develop: check-deps ## Run dagger develop (MODULE=<module> for specific module)
-	@if [ -n "$(MODULE)" ]; then \
-		echo "${GREEN}Developing $(MODULE)...${RESET}"; \
-		(cd $(MODULE) && dagger develop); \
-		$(call update_develop_results,$(MODULE)); \
-	else \
-		echo "${GREEN}Running dagger develop on all modules...${RESET}"; \
-		for module in $(MODULES); do \
-			$(call print_separator,"Developing $$module"); \
-			(cd $$module && dagger develop); \
-			$(call update_develop_results,$$module); \
-		done; \
+develop: check-deps ## Run dagger develop (MODULES="module1 module2" for specific modules)
+	@if [ -z "$(MODULES)" ]; then \
+		echo "${YELLOW}Error:${RESET} MODULES parameter is required. Usage: make develop MODULES='path/to/module1 path/to/module2'"; \
+		exit 1; \
 	fi
-	$(call print_develop_summary)
+	@for module in $(MODULES); do \
+		echo "${BLUE}----------------------------------------${RESET}"; \
+		echo "${BLUE}>>> Developing module: $$module${RESET}"; \
+		echo "${BLUE}----------------------------------------${RESET}"; \
+		cd $$module && dagger develop && cd $(CURDIR) || exit 1; \
+	done
+	@echo "${GREEN}All modules developed successfully!${RESET}"
 
 .PHONY: test
 test: check-deps ## Run tests (MODULE=<module> for specific module)
@@ -266,3 +247,6 @@ pipelines: check-deps ## Run operation on pipeline modules only (make pipelines 
 		$(call print_separator,"$$module - $(OPERATION)"); \
 		(cd $$module && make $(OPERATION)) || exit 1; \
 	done
+
+# Example usage:
+# make develop MODULES="libraries/digitalocean pipelines/n8n"
