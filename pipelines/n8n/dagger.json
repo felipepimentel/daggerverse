@@ -2,5 +2,41 @@
   "name": "n8n",
   "engineVersion": "v0.15.2",
   "sdk": "go",
-  "source": "."
+  "dependencies": [
+    {
+      "name": "digitalocean",
+      "source": "../../libraries/digitalocean"
+    },
+    {
+      "name": "ssh",
+      "source": "../../essentials/ssh"
+    }
+  ],
+  "source": ".",
+  "secrets": {
+    "do_token": {
+      "description": "DigitalOcean API token",
+      "required": true
+    },
+    "ssh_key": {
+      "description": "SSH private key for server access",
+      "required": true
+    },
+    "ssh_key_fingerprint": {
+      "description": "SSH key fingerprint registered in DigitalOcean",
+      "required": true
+    },
+    "ssh_key_id": {
+      "description": "SSH key ID registered in DigitalOcean",
+      "required": true
+    },
+    "n8n_basic_auth_password": {
+      "description": "Password for n8n basic auth",
+      "required": false
+    },
+    "n8n_encryption_key": {
+      "description": "Encryption key for n8n",
+      "required": false
+    }
+  }
 }

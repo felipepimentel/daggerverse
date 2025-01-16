@@ -3,7 +3,7 @@ MODULES := $(shell find . -name go.mod -not -path "*/\.*" -exec dirname {} \; | 
 
 # Module categories
 ESSENTIAL_MODULES := $(shell find essentials -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
-LANGUAGE_MODULES := $(shell find languages -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
+LANGUAGE_MODULES := $(shell if [ -d languages ]; then find languages -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort; fi)
 PIPELINE_MODULES := $(shell find pipelines -name go.mod -exec dirname {} \; | sed 's|^\./||' | sort)
 
 # Colors for pretty output
@@ -30,7 +30,8 @@ DEVELOP_FAILED :=
 
 # Function to update development results
 define update_develop_results
-	@if [ $$? -eq 0 ]; then \
+	@status=$$?; \
+	if [ $$status -eq 0 ]; then \
 		DEVELOP_SUCCESS="$$DEVELOP_SUCCESS$$1 "; \
 	else \
 		DEVELOP_FAILED="$$DEVELOP_FAILED$$1 "; \
