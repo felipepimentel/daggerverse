@@ -1,5 +1,6 @@
 {
   "name": "ssh-manager",
+  "engineVersion": "v0.15.2",
   "sdk": "go",
-  "dependencies": []
-} 
+  "source": "."
+}

@@ -92,3 +92,5 @@ node_modules
 /go.sum
 /main.go
 /dagger.gen.go
+
+.env
