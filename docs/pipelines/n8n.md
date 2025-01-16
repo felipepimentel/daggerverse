@@ -1,218 +1,138 @@
 # N8N Pipeline
 
-This module provides a comprehensive CI/CD pipeline for n8n workflow automation platform, with support for building, testing, and deploying to various environments including DigitalOcean.
+This module provides functionality for building, testing, and deploying n8n instances. It supports multiple deployment providers through a flexible provider interface.
 
 ## Features
 
-- Complete CI/CD pipeline for n8n
-- Docker container build and publish
-- Automated testing
-- DigitalOcean App Platform deployment
-- Environment variable management
-- Registry authentication support
-- Configurable instance sizing
-
-## Installation
-
-```bash
-dagger mod use github.com/felipepimentel/daggerverse/pipelines/n8n@latest
-```
+- Build n8n containers with proper configuration
+- Run tests on n8n instances
+- Deploy to multiple cloud providers (currently supports DigitalOcean)
+- Configurable environment variables
+- Volume persistence for data
+- Optional reverse proxy (Caddy) configuration
 
 ## Usage
 
 ### Basic Example
 
 ```go
-// Initialize the module
+// Create a new n8n instance
 n8n := dag.N8N().
-    WithSource(dag.Host().Directory(".")).
-    WithRegistry("your-registry").
+    WithSource(source).
+    WithRegistry("registry.example.com/n8n").
     WithTag("latest")
 
-// Run CI/CD pipeline
-container, err := n8n.CD(ctx)
+// Run tests
+if err := n8n.Test(ctx); err != nil {
+    return err
+}
+
+// Build and verify the container
+container, err := n8n.Build(ctx)
+if err != nil {
+    return err
+}
 ```
 
-### Configuration Options
-
-The module supports the following configuration:
+### Deployment with DigitalOcean
 
 ```go
-type N8N struct {
-    // Source directory containing n8n configuration
-    Source *dagger.Directory
-    // Environment variables for n8n
-    EnvVars []EnvVar
-    // Port to expose n8n on
-    Port int
-    // Registry to publish to
-    Registry string
-    // Image tag
-    Tag string
-    // Registry auth token
-    RegistryAuth *dagger.Secret
-    // DigitalOcean configuration
-    DOConfig *DOConfig
+// Create a DigitalOcean provider
+provider := &DigitalOceanProvider{
+    Token:        token,
+    Region:       "nyc1",
+    AppName:      "my-n8n",
+    InstanceSize: "basic-xxs",
+    Domain:       "n8n.example.com",  // Optional, adds Caddy reverse proxy if specified
 }
 
-type EnvVar struct {
-    Name  string
-    Value string
-}
+// Configure n8n with the provider
+n8n := dag.N8N().
+    WithSource(source).
+    WithRegistry("registry.digitalocean.com/myregistry/n8n").
+    WithTag("latest").
+    WithProvider(provider)
 
-type DOConfig struct {
-    Token        *dagger.Secret
-    Region       string
-    AppName      string
-    InstanceSize string
+// Deploy
+container, err := n8n.Deploy(ctx)
+```
+
+## Environment Variables
+
+The module supports all standard n8n environment variables. Common ones include:
+
+- `N8N_HOST`: The host where n8n will be accessible
+- `N8N_PROTOCOL`: Protocol (http/https)
+- `N8N_PORT`: Port to expose n8n on (default: 5678)
+- `N8N_BASIC_AUTH_ACTIVE`: Enable basic auth
+- `N8N_BASIC_AUTH_USER`: Basic auth username
+- `N8N_BASIC_AUTH_PASSWORD`: Basic auth password
+- `N8N_ENCRYPTION_KEY`: Key for encrypting credentials
+
+## Provider Interface
+
+The module uses a provider interface that allows implementing different deployment targets:
+
+```go
+type Provider interface {
+    Deploy(ctx context.Context, container *dagger.Container, registry string, tag string) error
+    GetStatus(ctx context.Context) (*dagger.Container, error)
 }
 ```
 
-### Building n8n
+Currently supported providers:
+- DigitalOcean: Deploys n8n to DigitalOcean Apps platform with optional Caddy reverse proxy
+
+To implement a new provider, create a struct that implements the Provider interface.
+
+## Methods
+
+### Build
+
+Creates a container with n8n installed and configured:
 
 ```go
 container, err := n8n.Build(ctx)
 ```
 
-### Testing
+### Test
+
+Runs tests if a package.json exists:
 
 ```go
 err := n8n.Test(ctx)
 ```
 
-### Publishing
+### Deploy
+
+Deploys n8n using the configured provider:
 
 ```go
-container, err := n8n.Publish(ctx)
+container, err := n8n.Deploy(ctx)
 ```
 
-## DigitalOcean Deployment
+### CI/CD
 
-This module supports direct deployment to DigitalOcean App Platform:
+The module provides CI/CD pipeline methods:
 
 ```go
-n8n := dag.N8N().
-    WithSource(dag.Host().Directory(".")).
-    WithRegistry("registry.digitalocean.com/your-registry").
-    WithTag("latest").
-    WithDOConfig(&DOConfig{
-        Token:        dag.SetSecret("do_token", "your-token"),
-        Region:       "nyc",
-        AppName:      "my-n8n",
-        InstanceSize: "basic-xxs",
-    })
+// Run CI pipeline (tests)
+err := n8n.CI(ctx)
 
+// Run CD pipeline (deploy)
 container, err := n8n.CD(ctx)
 ```
 
-## GitHub Actions Integration
+## Configuration Methods
 
-Create a workflow file `.github/workflows/n8n.yml`:
+The module uses a builder pattern for configuration:
 
-```yaml
-name: N8N CI/CD
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+- `WithSource(source)`: Sets the source directory
+- `WithRegistry(registry)`: Sets the container registry
+- `WithTag(tag)`: Sets the container tag
+- `WithRegistryAuth(auth)`: Sets registry authentication
+- `WithProvider(provider)`: Sets the deployment provider
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Dagger CLI
-        uses: dagger/dagger-for-github@v5
-        with:
-          version: "0.15.2"
-      
-      - name: Deploy n8n
-        env:
-          DO_TOKEN: ${{ secrets.DO_TOKEN }}
-        run: |
-          dagger call --progress=plain \
-            --source . \
-            cd \
-            --registry "registry.digitalocean.com/your-registry" \
-            --tag "latest" \
-            --do-token "$DO_TOKEN" \
-            --do-region "nyc" \
-            --do-app-name "my-n8n" \
-            --do-instance-size "basic-xxs"
-```
+## Data Persistence
 
-## Examples
-
-### Custom Port
-
-```go
-n8n := dag.N8N().
-    WithSource(dag.Host().Directory(".")).
-    WithPort(8080)
-```
-
-### Environment Variables
-
-```go
-n8n := dag.N8N().
-    WithSource(dag.Host().Directory(".")).
-    WithEnvVars([]EnvVar{
-        {Name: "N8N_HOST", Value: "0.0.0.0"},
-        {Name: "N8N_PORT", Value: "5678"},
-        {Name: "N8N_PROTOCOL", Value: "https"},
-    })
-```
-
-### Registry Authentication
-
-```go
-n8n := dag.N8N().
-    WithSource(dag.Host().Directory(".")).
-    WithRegistry("your-registry").
-    WithTag("latest").
-    WithRegistryAuth(dag.SetSecret("registry_auth", "your-auth-token"))
-```
-
-## Best Practices
-
-1. **Source Structure**:
-   - Keep n8n configuration in a dedicated directory
-   - Use `.env` files for environment variables
-   - Include proper health check endpoints
-
-2. **Configuration**:
-   - Always specify a tag for container images
-   - Use secrets for sensitive information
-   - Configure appropriate instance sizes
-
-3. **Development**:
-   - Run tests before deployment
-   - Use staging environments
-   - Monitor resource usage
-
-## Common Issues
-
-1. **Build Failures**:
-   - Check Node.js version compatibility
-   - Verify all dependencies are installed
-   - Ensure proper registry permissions
-
-2. **Deployment Issues**:
-   - Verify DigitalOcean token permissions
-   - Check resource quotas
-   - Validate health check configuration
-
-3. **Runtime Problems**:
-   - Monitor container logs
-   - Check environment variables
-   - Verify network connectivity
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guidelines](../CONTRIBUTING.md) for details on how to submit pull requests.
-
-## License
-
-This module is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details. 
+The module automatically configures a persistent volume for n8n data at `/data` in the container. 

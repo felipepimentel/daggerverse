@@ -8,8 +8,16 @@ import (
 	"dagger/n8n/internal/dagger"
 )
 
+// Provider defines the interface for deployment providers
+type Provider interface {
+	DaggerObject
+	Deploy(ctx context.Context, container *dagger.Container, registry string, tag string) error
+	GetStatus(ctx context.Context) (*dagger.Container, error)
+}
+
 // N8N provides methods for building and deploying n8n
 type N8N struct {
+	DaggerObject
 	// Source directory containing n8n configuration
 	Source *dagger.Directory
 	// Environment variables for n8n
@@ -22,22 +30,36 @@ type N8N struct {
 	Tag string
 	// Registry auth token
 	RegistryAuth *dagger.Secret
-	// DigitalOcean configuration
+	// Deployment provider
+	Provider Provider
+	// DigitalOcean configuration (for backward compatibility)
 	DOConfig *DOConfig
 }
 
 // EnvVar represents an environment variable
 type EnvVar struct {
+	DaggerObject
 	Name  string
 	Value string
 }
 
 // DOConfig represents DigitalOcean-specific configuration
 type DOConfig struct {
+	DaggerObject
 	Token        *dagger.Secret
 	Region       string
 	AppName      string
 	InstanceSize string
+}
+
+// DigitalOceanProvider implements the Provider interface for DigitalOcean
+type DigitalOceanProvider struct {
+	DaggerObject
+	Token        *dagger.Secret
+	Region       string
+	AppName      string
+	InstanceSize string
+	Domain       string
 }
 
 // Build creates a container with n8n installed and configured
@@ -46,9 +68,13 @@ func (n *N8N) Build(ctx context.Context) (*dagger.Container, error) {
 		return nil, fmt.Errorf("source directory is required")
 	}
 
+	// Create n8n volume for persistence
+	n8nVolume := dag.CacheVolume("n8n_data")
+
 	container := dag.Container().
 		From("node:18-alpine").
 		WithMountedDirectory("/app", n.Source).
+		WithMountedCache("/data", n8nVolume).
 		WithWorkdir("/app").
 		WithExec([]string{"npm", "install", "-g", "n8n"})
 
@@ -63,8 +89,8 @@ func (n *N8N) Build(ctx context.Context) (*dagger.Container, error) {
 	}
 
 	return container.
-			WithExposedPort(n.Port).
-			WithEntrypoint([]string{"n8n", "start"}), nil
+		WithExposedPort(n.Port).
+		WithEntrypoint([]string{"n8n", "start"}), nil
 }
 
 // Test runs n8n tests
@@ -128,81 +154,166 @@ func (n *N8N) Publish(ctx context.Context) (*dagger.Container, error) {
 	return dag.Container().From(publishedRef), nil
 }
 
-// CI runs the CI pipeline for n8n
-func (n *N8N) CI(ctx context.Context) error {
-	// Run tests
-	if err := n.Test(ctx); err != nil {
-		return fmt.Errorf("CI failed: %w", err)
-	}
-
-	// Build container to verify it works
-	_, err := n.Build(ctx)
-	if err != nil {
-		return fmt.Errorf("CI failed: %w", err)
-	}
-
-	return nil
-}
-
-// CD runs the CD pipeline for n8n
-func (n *N8N) CD(ctx context.Context) (*dagger.Container, error) {
-	// Run CI first
-	if err := n.CI(ctx); err != nil {
-		return nil, fmt.Errorf("CD failed: %w", err)
+// Deploy deploys n8n using the configured provider
+func (n *N8N) Deploy(ctx context.Context) (*dagger.Container, error) {
+	if n.Provider == nil {
+		return nil, fmt.Errorf("deployment provider is required")
 	}
 
 	// Build and publish the container
 	container, err := n.Publish(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("CD failed: %w", err)
+		return nil, fmt.Errorf("deployment failed: %w", err)
 	}
 
-	// If DigitalOcean config is provided, deploy to DO
-	if n.DOConfig != nil {
-		if n.DOConfig.Token == nil {
-			return nil, fmt.Errorf("DigitalOcean token is required for deployment")
-		}
-
-		// Get token value
-		token, err := n.DOConfig.Token.Plaintext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token: %w", err)
-		}
-
-		// Create a new container with doctl
-		doctlContainer := dag.Container().
-			From("digitalocean/doctl:latest").
-			WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token)
-
-		// Create app spec
-		appSpec := fmt.Sprintf(`{
-			"name": "%s",
-			"region": "%s",
-			"services": [{
-				"name": "%s",
-				"instance_size_slug": "%s",
-				"instance_count": 1,
-				"image": {
-					"registry_type": "DOCR",
-					"repository": "%s",
-					"tag": "%s"
-				},
-				"health_check": {
-					"http_path": "/healthz"
-				}
-			}]
-		}`, n.DOConfig.AppName, n.DOConfig.Region, n.DOConfig.AppName, n.DOConfig.InstanceSize, n.Registry, n.Tag)
-
-		// Create app
-		_, err = doctlContainer.
-			WithExec([]string{"apps", "create", "--spec", appSpec}).
-			Sync(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create app: %w", err)
-		}
-
-		return doctlContainer, nil
+	// Deploy using the provider
+	if err := n.Provider.Deploy(ctx, container, n.Registry, n.Tag); err != nil {
+		return nil, fmt.Errorf("deployment failed: %w", err)
 	}
 
 	return container, nil
+}
+
+// Deploy implements the Provider interface for DigitalOcean
+func (p *DigitalOceanProvider) Deploy(ctx context.Context, container *dagger.Container, registry string, tag string) error {
+	if p.Token == nil {
+		return fmt.Errorf("DigitalOcean token is required")
+	}
+
+	// Get token value
+	token, err := p.Token.Plaintext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get token: %w", err)
+	}
+
+	// Create app spec with Caddy configuration if domain is provided
+	services := []map[string]interface{}{
+		{
+			"name":              "n8n",
+			"instance_size_slug": p.InstanceSize,
+			"instance_count":    1,
+			"image": map[string]string{
+				"registry_type": "DOCR",
+				"repository":    registry,
+				"tag":          tag,
+			},
+			"health_check": map[string]interface{}{
+				"http_path":             "/healthz",
+				"initial_delay_seconds": 30,
+			},
+			"volumes": []map[string]string{
+				{
+					"name":       "n8n-data",
+					"mount_path": "/data",
+				},
+			},
+		},
+	}
+
+	// Add Caddy service if domain is provided
+	if p.Domain != "" {
+		services = append(services, map[string]interface{}{
+			"name":              "caddy",
+			"instance_size_slug": "basic-xxs",
+			"instance_count":    1,
+			"image": map[string]string{
+				"registry_type": "DOCKER_HUB",
+				"repository":    "caddy",
+				"tag":          "2.7-alpine",
+			},
+			"volumes": []map[string]string{
+				{
+					"name":       "caddy-data",
+					"mount_path": "/data",
+				},
+			},
+			"env": []map[string]string{
+				{
+					"key":   "DOMAIN",
+					"value": p.Domain,
+				},
+			},
+		})
+	}
+
+	// Create app spec
+	appSpec := map[string]interface{}{
+		"name":     p.AppName,
+		"region":   p.Region,
+		"services": services,
+	}
+
+	// Create a new container with doctl
+	_, err = dag.Container().
+		From("digitalocean/doctl:latest").
+		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
+		WithExec([]string{"apps", "create", "--spec", fmt.Sprintf("%v", appSpec)}).
+		Sync(ctx)
+
+	return err
+}
+
+// GetStatus implements the Provider interface for DigitalOcean
+func (p *DigitalOceanProvider) GetStatus(ctx context.Context) (*dagger.Container, error) {
+	if p.Token == nil {
+		return nil, fmt.Errorf("DigitalOcean token is required")
+	}
+
+	// Get token value
+	token, err := p.Token.Plaintext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token: %w", err)
+	}
+
+	// Get app status
+	return dag.Container().
+		From("digitalocean/doctl:latest").
+		WithEnvVariable("DIGITALOCEAN_ACCESS_TOKEN", token).
+		WithExec([]string{"apps", "list", "--format", "json"}), nil
+}
+
+// CI runs the CI pipeline for n8n
+func (n *N8N) CI(ctx context.Context) error {
+	if n.Source == nil && n.Registry == "" && n.Tag == "" {
+		return fmt.Errorf("source, registry and tag are required")
+	}
+	return n.Test(ctx)
+}
+
+// CD runs the CD pipeline for n8n
+func (n *N8N) CD(ctx context.Context) (*dagger.Container, error) {
+	if n.Source == nil && n.Registry == "" && n.Tag == "" {
+		return nil, fmt.Errorf("source, registry and tag are required")
+	}
+	return n.Deploy(ctx)
+}
+
+// WithSource sets the source directory
+func (n *N8N) WithSource(source *dagger.Directory) *N8N {
+	n.Source = source
+	return n
+}
+
+// WithRegistry sets the registry
+func (n *N8N) WithRegistry(registry string) *N8N {
+	n.Registry = registry
+	return n
+}
+
+// WithTag sets the tag
+func (n *N8N) WithTag(tag string) *N8N {
+	n.Tag = tag
+	return n
+}
+
+// WithRegistryAuth sets the registry auth token
+func (n *N8N) WithRegistryAuth(auth *dagger.Secret) *N8N {
+	n.RegistryAuth = auth
+	return n
+}
+
+// WithProvider sets the deployment provider
+func (n *N8N) WithProvider(provider Provider) *N8N {
+	n.Provider = provider
+	return n
 }
