@@ -11,6 +11,7 @@ GREEN  := \033[32m
 YELLOW := \033[33m
 WHITE  := \033[37m
 RESET  := \033[0m
+RED    := \033[31m
 
 # Separator for visual clarity
 define print_separator
@@ -21,6 +22,40 @@ define print_separator
 	echo "${WHITE}"; \
 	printf '=%.0s' {1..80}; \
 	echo "${RESET}"
+endef
+
+# Variables to store development results
+DEVELOP_SUCCESS := 
+DEVELOP_FAILED := 
+
+# Function to update development results
+define update_develop_results
+	@if [ $$? -eq 0 ]; then \
+		DEVELOP_SUCCESS="$$DEVELOP_SUCCESS$$1 "; \
+	else \
+		DEVELOP_FAILED="$$DEVELOP_FAILED$$1 "; \
+	fi
+endef
+
+# Function to print development summary
+define print_develop_summary
+	@echo "\n${WHITE}=== Development Summary ===${RESET}"
+	@if [ -n "$$DEVELOP_SUCCESS" ]; then \
+		echo "${GREEN}Successful modules:${RESET}"; \
+		for module in $$DEVELOP_SUCCESS; do \
+			echo "  ✓ $$module"; \
+		done; \
+	fi
+	@if [ -n "$$DEVELOP_FAILED" ]; then \
+		echo "\n${RED}Failed modules:${RESET}"; \
+		for module in $$DEVELOP_FAILED; do \
+			echo "  ✗ $$module"; \
+		done; \
+		exit 1; \
+	fi
+	@if [ -z "$$DEVELOP_SUCCESS" ] && [ -z "$$DEVELOP_FAILED" ]; then \
+		echo "${YELLOW}No modules were processed${RESET}"; \
+	fi
 endef
 
 # Default target
@@ -98,13 +133,16 @@ develop: check-deps ## Run dagger develop (MODULE=<module> for specific module)
 	@if [ -n "$(MODULE)" ]; then \
 		echo "${GREEN}Developing $(MODULE)...${RESET}"; \
 		(cd $(MODULE) && dagger develop); \
+		$(call update_develop_results,$(MODULE)); \
 	else \
 		echo "${GREEN}Running dagger develop on all modules...${RESET}"; \
 		for module in $(MODULES); do \
 			$(call print_separator,"Developing $$module"); \
 			(cd $$module && dagger develop); \
+			$(call update_develop_results,$$module); \
 		done; \
 	fi
+	$(call print_develop_summary)
 
 .PHONY: test
 test: check-deps ## Run tests (MODULE=<module> for specific module)

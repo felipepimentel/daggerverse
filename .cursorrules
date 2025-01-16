@@ -1,6 +1,4 @@
-# Cursor Rules for Daggerverse
-
-## Commit Message Format
+## **Commit Message Format**
 
 ```
 type(scope): subject
@@ -10,7 +8,7 @@ type(scope): subject
 [optional footer(s)]
 ```
 
-## Types
+### **Types**
 
 - `feat`: A new feature (minor version)
   - New functionality in reusable modules
@@ -24,7 +22,7 @@ type(scope): subject
   - Optimizations in reusable modules
   - Workflow performance improvements
   - Build efficiency updates
-- `docs`: Documentation only changes (patch version)
+- `docs`: Documentation-only changes (patch version)
   - Updates to README or module-specific documentation
   - Comments explaining module behaviors
   - Changes in documentation for `.dagger/` workflows
@@ -53,209 +51,186 @@ type(scope): subject
   - Administrative changes
   - Dependency updates without code modifications
 
-## Scopes
+### **Scopes**
 
-The scope is mandatory and must be one of:
-
-### Language-specific Scopes
-
+#### Language-Specific Scopes
 - `python`: Changes related to Python modules and functionality
 - `nodejs`: Changes related to Node.js modules and functionality
 - `ruby`: Changes related to Ruby modules and functionality
 
-### Module-specific Scopes
+#### Module-Specific Scopes
+- `<language>-<module_name>`: Changes related to specific modules (e.g., `python-pipeline`, `nodejs-scheduler`)
+- Any new module name must follow the pattern `<language>-<module_name>`.
 
-- `python-pipeline`: Changes related to the Python pipeline module
-- `python-poetry`: Changes related to the Python Poetry module
-- `python-pypi`: Changes related to the Python PyPI module
-- `versioner`: Changes related to the versioner module
-- Any new module name that follows the pattern `<language>-*` or represents a specific tool
-
-### General Scopes
-
+#### General Scopes
 - `global`: Repository-wide changes or changes affecting multiple modules
 
-## Commit Message Rules
+---
+
+## **Commit Message Rules**
 
 1. **Subject Line:**
-
    - Format: `type(scope): subject`
-   - Use the present tense (e.g., "Add feature", not "Added feature")
-   - Keep it concise (72 characters or fewer)
-   - Avoid ending with a period
-   - Scope is mandatory and must be one of: python, nodejs, ruby, global
-   - Example: `feat(python): add new testing pipeline`
+   - Use present tense (e.g., "Add feature", not "Added feature").
+   - Keep it concise (72 characters or fewer).
+   - Avoid ending with a period.
+   - Example: `feat(python): add new testing pipeline`.
 
 2. **Body:**
-
-   - Must be separated from subject by a blank line
-   - Each line must not exceed 100 characters
-   - Use bullet points (-) for multiple items
-   - Explain what and why, not how
-   - Break long lines with proper indentation for readability
+   - Must be separated from the subject by a blank line.
+   - Explain _what_ and _why_, not _how_.
+   - Use bullet points for multiple items.
    - Example:
-
      ```
      feat(python): add new testing pipeline
 
-     - Implemented comprehensive test suite for Python packages with coverage
-       reporting and analysis.
-     - Added integration with popular testing frameworks to ensure
-       compatibility.
-     - Enhanced reporting capabilities to provide detailed test results and
-       metrics.
+     - Added comprehensive tests with coverage reporting
+     - Integrated with popular testing frameworks
+     - Enhanced reporting for detailed metrics
      ```
 
 3. **Breaking Changes:**
-
-   - Add `!` after the type/scope: `feat(python)!: change API structure`
-   - Include `BREAKING CHANGE:` section in footer
+   - Add `!` after the type/scope: `feat(python)!: change API structure`.
+   - Include a `BREAKING CHANGE:` section in the footer.
    - Example:
-
      ```
-     feat(python)!: change testing API structure
+     feat(python)!: update testing API structure
 
-     - Redesigned test runner interface for better extensibility
-     - Added new configuration options for test environments
-
-     BREAKING CHANGE: The test runner now requires explicit configuration
-     file. See migration guide for details.
+     BREAKING CHANGE: The test runner now requires explicit configuration.
      ```
 
-## Protected Files and Directories
+---
 
-- **`internal/`**: Auto-generated directory. Do not modify files inside this directory manually. Regenerate it using `dagger develop` when changes are required.
-- **`dagger.gen.go`**: Auto-generated file. Any modifications must be done by rerunning `dagger develop`. Direct edits are prohibited.
+## **Module Naming and Structure**
 
-## GitHub Actions Workflows
+1. **Module Import Path**
+   - Modules must follow this structure:  
+     ```
+     github.com/felipepimentel/daggerverse/<pasta>/<module_name>/internal/dagger
+     ```
 
-### Workflow Types and Responsibilities
+2. **Directory Responsibilities**
+   - **`internal/`**: Contains auto-generated files. **Do not manually modify files here**.
+   - **`dagger.gen.go`**: An auto-generated file. Any updates must be done using:
+     ```bash
+     dagger develop
+     ```
 
-1. **CI Workflow (ci.yml)**:
+3. **Protected Components**
+   - Changes to `dagger.gen.go` or files in `/internal` are prohibited.
+   - Validate generated content with the `dagger develop` command.
 
-   - Purpose: Internal workflow for publishing Dagger modules
-   - Location: `.github/workflows/ci.yml`
-   - Responsibilities:
-     - Detecting changes in Dagger modules
-     - Managing semantic releases
-     - Publishing modules to Daggerverse
-   - NOT to be used by external projects
+4. **Example Module Structure**
+   ```
+   daggerverse/
+   ├── python/
+   │   ├── pipeline/
+   │   │   ├── go.mod
+   │   │   ├── main.go
+   │   │   └── internal/
+   │   │       └── dagger/
+   │   │           ├── dagger.gen.go
+   │   │           └── (other auto-generated files)
+   ├── nodejs/
+   │   ├── scheduler/
+   └── global/
+   ```
 
-2. **Reusable Workflows (reusable-\*.yml)**:
-   - Purpose: Public workflows for external projects
-   - Location: `.github/workflows/reusable-*.yml`
-   - Example: `reusable-python-ci.yml`
-   - Responsibilities:
-     - Providing standardized CI/CD pipelines
-     - Handling common tasks (testing, building, publishing)
-   - Designed to be consumed by external projects
+---
 
-### Usage Guidelines
+## **Reusing Internal Modules**
 
-- Never mix responsibilities between CI and reusable workflows
-- Keep CI workflow focused on Dagger module management
-- Keep reusable workflows generic and self-contained
-- Document each workflow's purpose and requirements clearly
+### **1. Declaring Module Dependencies**
 
-## Breaking Changes
+To reuse an internal module, declare it as a dependency in your module’s `dagger.json` file. This ensures the dependency is linked during the development process.
 
-Breaking changes must follow these guidelines:
-
-1. Add `!` after the type/scope in the commit header.
-2. Include a `BREAKING CHANGE:` section in the commit footer.
-3. Provide a clear explanation of the change, its impact, and migration instructions.
-
-Example:
-
-```
-feat(dagger)!: update Dagger workflow API
-
-BREAKING CHANGE: The workflow structure now requires a `dagger.yml` configuration.
-Ensure all workflows include this file in the root of `.dagger/` before running pipelines.
-```
-
-## Rules
-
-### Commit Messages
-
-1. **Subject Line:**
-
-   - Use the present tense (e.g., "Add feature", not "Added feature").
-   - Keep it concise (72 characters or fewer).
-   - Avoid ending with a period.
-   - Ensure it is descriptive and follows the format: `type(scope): subject`.
-
-2. **Body:**
-
-   - Provide context when necessary.
-   - Explain _what_ and _why_, not _how_.
-   - Use bullet points for multiple changes or detailed descriptions.
-
-3. **Breaking Changes:**
-   - Explicitly mark with `!` and `BREAKING CHANGE:`.
-   - Provide a migration guide if applicable.
-
-### Tagging
-
-Tags should follow this format:
-
-```
-<module>/v<version>
-Examples:
-- go/v1.0.0
-- dagger/v0.2.1
+Example `dagger.json`:
+```json
+{
+  "name": "wolfi",
+  "engineVersion": "v0.15.2",
+  "sdk": "go",
+  "dependencies": [
+    {
+      "name": "apko",
+      "source": "../apko"
+    }
+  ],
+  "source": "."
+}
 ```
 
-### Automatic Versioning
+### **2. Using Internal Modules**
 
-- **`feat`:** Increments minor version (e.g., 1.1.0).
-- **`fix` or `perf`:** Increments patch version (e.g., 1.0.1).
-- **Breaking changes:** Increments major version (e.g., 2.0.0).
+After declaring the dependency in `dagger.json`, you can access the module’s exported structures or methods by importing it into your Go code. For example:
 
-### Changelog Management
+```go
+package main
 
-- Use the [Keep a Changelog](https://keepachangelog.com/) format.
-- Group changes by type and scope.
-- Link to relevant issues/PRs for context.
-- Highlight breaking changes in a dedicated section.
+import (
+	"github.com/felipepimentel/daggerverse/essentials/wolfi/internal/dagger"
+)
 
-### File and Directory Management
+// A Dagger Module to integrate with Wolfi Linux
+type Wolfi struct{}
 
-1. **Project Structure:**
+// Build a Wolfi Linux container
+func (w *Wolfi) Container(
+	// APK packages to install
+	// +optional
+	packages []string,
+	// Overlay images to merge on top of the base.
+	// +optional
+	overlays []*dagger.Container,
+) *dagger.Container {
+	ctr := dag.Apko().Wolfi(packages)
+	for _, overlay := range overlays {
+		ctr = ctr.WithDirectory("/", overlay.Rootfs())
+	}
+	return ctr
+}
+```
 
-   - Each reusable module must reside in its own directory under the root.
-   - CI/CD workflows should be defined entirely within `.dagger/`.
+In this example:
+- The `dag.Apko()` function refers to the `apko` dependency declared in `dagger.json`.
+- Dependencies are structured to encourage code reuse and modularity.
 
-2. **Protected Components:**
+### **3. Guidelines for Reusing Modules**
 
-   - **Do not manually edit** `dagger.gen.go` or files in `internal/`.
-   - Regenerate these files using `dagger develop` as necessary.
+- **Always declare dependencies** in `dagger.json` to make them explicit and trackable.
+- **Avoid duplicating logic**; reuse existing modules when functionality overlaps.
+- **Leverage internal APIs**: Use exported functions or methods provided by the dependent module.
+- **Document dependencies** in the README or inline comments to clarify module relationships.
 
-3. **Directory Responsibilities:**
-   - **`.dagger/`:** Primary location for workflow logic and automation scripts.
-   - **`.github/`:** Reserved for GitHub Actions configurations that reference `.dagger/`.
+---
 
-### Code Quality
+## **Code Quality Rules**
 
-1. **Go Code:**
-
-   - Follow idiomatic Go practices.
+1. **General**
+   - Adhere to idiomatic Go practices.
    - Ensure all changes pass linting and formatting checks.
    - Write unit tests for all new or modified functionality.
-   - **Import Dagger modules correctly:** Always use the import path `dagger/<module>/internal/dagger` instead of `dagger.io/dagger`.
-   - **Module Naming Convention:** Ensure the `module` directive in `go.mod` follows the format `module dagger/<module_name>` instead of `module github.com/felipepimentel/daggerverse/<module_name>`.
 
-2. **Dagger Workflows:**
+2. **Dagger Workflow-Specific Rules**
+   - Always use `dagger/<module>/internal/dagger` for imports.
+   - Validate Dagger and Go versions:
+     - Dagger version: `0.15.2`.
+     - Go version: `1.23.2`.
 
-   - Keep workflows modular and reusable.
-   - Ensure pipelines are well-documented and tested.
-   - **Version Requirements:** Ensure the Dagger version is `0.15.2` and Go version is `1.23.2`. Validate this in all configurations.
+3. **Testing**
+   - Mock external dependencies where possible.
+   - Ensure CI/CD workflows test all critical paths.
 
-3. **Documentation:**
-   - Update README and module-specific documentation as necessary.
-   - Clearly explain the purpose and usage of all modules and workflows.
-   - Highlight the correct import paths, module naming conventions, and required versions for Go and Dagger.
+4. **Documentation**
+   - Clearly describe module purpose and usage.
+   - Highlight any requirements for Dagger or Go versions.
 
-### Response Confirmation
+---
 
-- Always verify adherence to these rules by starting responses to related queries with: **"Ok seu lindo"**. This ensures compliance with the provided instructions.
+## **Breaking Changes**
+
+1. **Commit Header:**
+   - Use `!` after `type(scope)` (e.g., `feat(python)!:`).
+
+2. **Commit Footer:**
+   - Include a `BREAKING CHANGE:` section explaining the impact and migration steps.

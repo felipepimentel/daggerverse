@@ -19,21 +19,6 @@ type SshOpts struct {
 	Login        string
 }
 
-// FIXME: custom struct as args is currently unsupported
-// (Error: unsupported list of objects "SshOpts" for flag: opts)
-// Keeping the code for later
-//
-// // example usage: "dagger call --destination machine.localdomain"
-// func New(destination string, opts ...SshOpts) (*Ssh, error) {
-// 	baseCtr := dag.Container().From("alpine:3").WithExec([]string{"apk", "add", "--no-cache", "openssh-client"})
-// 	ssh := &Ssh{
-// 		Destination: destination,
-// 		Opts:        opts,
-// 		BaseCtr:     baseCtr,
-// 	}
-// 	return ssh, nil
-// }
-
 func New(destination string, identityFile *dagger.Secret) (*Ssh, error) {
 	baseCtr := dag.Container().From("alpine:3").WithExec([]string{"apk", "add", "--no-cache", "openssh-client"})
 

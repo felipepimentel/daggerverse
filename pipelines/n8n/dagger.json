@@ -1,7 +1,6 @@
 {
   "name": "n8n",
+  "engineVersion": "v0.15.2",
   "sdk": "go",
-  "dependencies": [],
-  "source": ".",
-  "engineVersion": "v0.9.7"
+  "source": "."
 }
