@@ -14,11 +14,6 @@ type Docker struct {
 	registry *RegistryConfig
 }
 
-// Label represents a Docker label
-type Label struct {
-	Key   string
-	Value string
-}
 
 // BuildArg represents a Docker build argument
 type BuildArg struct {
@@ -34,15 +29,15 @@ type DriverOpt struct {
 
 // ImageConfig represents configuration for Docker image operations
 type ImageConfig struct {
-	Source      string       // Source image name
-	Target      string       // Target image name
-	Tag         string       // Image tag
-	Labels      []Label      // Image labels
-	BuildArgs   []BuildArg   // Build arguments
-	Dockerfile  string       // Path to Dockerfile
+	Source      string            // Source image name
+	Target      string            // Target image name
+	Tag         string            // Image tag
+	Labels      []*dagger.Label   // Image labels
+	BuildArgs   []BuildArg        // Build arguments
+	Dockerfile  string            // Path to Dockerfile
 	Context     *dagger.Directory // Build context
-	PullPolicy  string       // Pull policy (always, never, if-not-present)
-	Registry    string       // Registry URL
+	PullPolicy  string           // Pull policy (always, never, if-not-present)
+	Registry    string           // Registry URL
 }
 
 // RegistryConfig represents configuration for Docker registry operations
@@ -54,20 +49,20 @@ type RegistryConfig struct {
 
 // VolumeConfig represents configuration for Docker volume operations
 type VolumeConfig struct {
-	Name       string       // Volume name
-	Driver     string       // Volume driver
-	Labels     []Label      // Volume labels
-	DriverOpts []DriverOpt  // Driver-specific options
+	Name       string          // Volume name
+	Driver     string          // Volume driver
+	Labels     []*dagger.Label // Volume labels
+	DriverOpts []DriverOpt     // Driver-specific options
 }
 
 // NetworkConfig represents configuration for Docker network operations
 type NetworkConfig struct {
-	Name       string       // Network name
-	Driver     string       // Network driver
-	Labels     []Label      // Network labels
-	DriverOpts []DriverOpt  // Driver-specific options
-	Internal   bool         // Internal network
-	IPv6       bool         // Enable IPv6
+	Name       string          // Network name
+	Driver     string          // Network driver
+	Labels     []*dagger.Label // Network labels
+	DriverOpts []DriverOpt     // Driver-specific options
+	Internal   bool            // Internal network
+	IPv6       bool            // Enable IPv6
 }
 
 // New creates a new Docker client
@@ -94,7 +89,15 @@ func (d *Docker) PullImage(ctx context.Context, image, tag string, config *Image
 		
 		if config.Labels != nil {
 			for _, label := range config.Labels {
-				container = container.WithLabel(label.Key, label.Value)
+				name, err := label.Name(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get label name: %w", err)
+				}
+				value, err := label.Value(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get label value: %w", err)
+				}
+				container = container.WithLabel(name, value)
 			}
 		}
 	}
@@ -108,7 +111,15 @@ func (d *Docker) PushImage(ctx context.Context, config ImageConfig) error {
 	
 	if config.Labels != nil {
 		for _, label := range config.Labels {
-			container = container.WithLabel(label.Key, label.Value)
+			name, err := label.Name(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get label name: %w", err)
+			}
+			value, err := label.Value(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get label value: %w", err)
+			}
+			container = container.WithLabel(name, value)
 		}
 	}
 
@@ -152,7 +163,15 @@ func (d *Docker) BuildImage(ctx context.Context, config ImageConfig) (*dagger.Co
 
 	if config.Labels != nil {
 		for _, label := range config.Labels {
-			container = container.WithLabel(label.Key, label.Value)
+			name, err := label.Name(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get label name: %w", err)
+			}
+			value, err := label.Value(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get label value: %w", err)
+			}
+			container = container.WithLabel(name, value)
 		}
 	}
 

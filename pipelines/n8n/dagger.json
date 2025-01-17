@@ -8,31 +8,13 @@
       "source": "../../libraries/digitalocean"
     },
     {
-      "name": "ssh",
-      "source": "../../essentials/ssh"
-    },
-    {
-      "name": "dig",
-      "source": "../../essentials/dig"
-    },
-    {
-      "name": "curl",
-      "source": "../../essentials/curl"
-    },
-    {
       "name": "docker",
       "source": "../../libraries/docker"
+    },
+    {
+      "name": "ssh",
+      "source": "../../essentials/ssh"
     }
   ],
-  "source": ".",
-  "secrets": {
-    "do_token": {
-      "description": "DigitalOcean API token",
-      "required": true
-    },
-    "ssh_key": {
-      "description": "SSH private key for server access",
-      "required": true
-    }
-  }
+  "source": "."
 }
