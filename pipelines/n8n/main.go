@@ -4,367 +4,301 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/felipepimentel/daggerverse/pipelines/n8n/internal/dagger"
 )
 
-// Error messages for common failures
-const (
-	errSetupRegistry   = "failed to setup registry"
-	errPushImages      = "failed to push images"
-	errCreateDroplet   = "failed to create droplet"
-	errConfigureDNS    = "failed to configure DNS"
-	errSetupServer     = "failed to setup server"
-	errDeployServices  = "failed to deploy services"
-	errSetupMonitoring = "failed to setup monitoring"
-	errSetupBackups    = "failed to setup backups"
-)
-
-// Log messages for progress tracking
-const (
-	logStartDeploy     = "Starting n8n deployment..."
-	logSetupRegistry   = "Setting up container registry..."
-	logPushImages      = "Pushing required images..."
-	logCreateDroplet   = "Creating DigitalOcean droplet..."
-	logConfigureDNS    = "Configuring DNS..."
-	logSetupServer     = "Setting up server..."
-	logDeployServices  = "Deploying services..."
-	logSetupMonitoring = "Setting up monitoring..."
-	logSetupBackups    = "Setting up backups..."
-	logSuccess         = "Deployment completed successfully!"
-)
-
-// N8N represents the n8n deployment pipeline configuration
+// N8N handles the deployment of n8n to DigitalOcean
 type N8N struct {
-	// Base configuration
-	Domain     string // e.g., "example.com"
-	Subdomain  string // e.g., "n8n"
-	Region     string // e.g., "nyc1"
-	Size       string // e.g., "s-2vcpu-4gb"
-	SSHKeyName string // Name of the SSH key in DigitalOcean
-
-	// Registry configuration
-	RegistryName string // e.g., "n8n-registry"
-
-	// n8n specific configuration
-	N8nVersion string // e.g., "0.234.0"
-	N8nPort    int    // e.g., 5678
-
-	// Database configuration
-	PostgresVersion string // e.g., "15-alpine"
-	PostgresUser    string
-	PostgresPass    string
-	PostgresDB      string
-
-	// Backup configuration
-	BackupEnabled    bool
-	BackupCron       string // e.g., "0 0 * * *"
-	BackupRetention  int    // Number of days to retain backups
-
-	// Monitoring configuration
-	MonitoringEnabled bool
-	CAdvisorPort     int // e.g., 8080
-
-	// SSL/TLS configuration
-	SSLEmail string // Email for Let's Encrypt
-}
-
-// New creates a new instance of the N8N pipeline with default values
-func New(
 	// Domain for the n8n instance
-	// +optional
-	domain string,
+	Domain string
 	// Subdomain for the n8n instance
-	// +optional
-	subdomain string,
-	// SSH key name in DigitalOcean
-	// +optional
-	sshKeyName string,
-	// Region for deployment
-	// +optional
-	// +default="nyc1"
-	region string,
-	// Droplet size
-	// +optional
-	// +default="s-2vcpu-4gb"
-	size string,
-) *N8N {
-	if region == "" {
-		region = "nyc1"
-	}
-	if size == "" {
-		size = "s-2vcpu-4gb"
-	}
+	Subdomain string
+	// Registry name in DigitalOcean
+	RegistryName string
+	// N8n version to deploy
+	N8nVersion string
+	// Region for the droplet
+	Region string
+	// Size for the droplet
+	Size string
+}
 
+// New creates a new instance of the N8N module
+func New() *N8N {
 	return &N8N{
-		Domain:           domain,
-		Subdomain:       subdomain,
-		Region:          region,
-		Size:            size,
-		SSHKeyName:      sshKeyName,
-		RegistryName:    "n8n-registry",
-		N8nVersion:      "0.234.0",
-		N8nPort:         5678,
-		PostgresVersion: "15-alpine",
-		PostgresUser:    "n8n",
-		PostgresPass:    "n8n",
-		PostgresDB:      "n8n",
-		BackupEnabled:   true,
-		BackupCron:      "0 0 * * *",
-		BackupRetention: 7,
-		MonitoringEnabled: true,
-		CAdvisorPort:    8080,
+		Domain:       "pepper88.com",
+		Subdomain:    "n8n",
+		RegistryName: "n8n-registry",
+		N8nVersion:   "0.234.0",
+		Region:       "syd1",
+		Size:         "s-1vcpu-1gb",
 	}
 }
 
-// Deploy orchestrates the complete n8n deployment pipeline
-func (n *N8N) Deploy(ctx context.Context, doToken, sshKey *dagger.Secret) error {
-	fmt.Println(logStartDeploy)
+// Deploy orchestrates the n8n deployment
+func (n *N8N) Deploy(ctx context.Context, doToken *dagger.Secret) error {
+	fmt.Println("Starting n8n deployment...")
 
-	// Step 1: Set up container registry
-	fmt.Println(logSetupRegistry)
-	registry := dag.Container().From("registry:2")
-	if err := n.setupRegistry(ctx, registry); err != nil {
-		return fmt.Errorf("%s: %w", errSetupRegistry, err)
-	}
-
-	// Step 2: Push required images
-	fmt.Println(logPushImages)
-	if err := n.pushImages(ctx, registry); err != nil {
-		return fmt.Errorf("%s: %w", errPushImages, err)
-	}
-
-	// Step 3: Create droplet
-	fmt.Println(logCreateDroplet)
-	dropletIP, err := n.createDroplet(ctx, doToken)
+	// Get DO token plaintext
+	tokenValue, err := doToken.Plaintext(ctx)
 	if err != nil {
-		return fmt.Errorf("%s: %w", errCreateDroplet, err)
+		return fmt.Errorf("failed to get DO token plaintext: %w", err)
 	}
 
-	// Step 4: Configure DNS
-	fmt.Println(logConfigureDNS)
-	if err := n.configureDNS(ctx, doToken, dropletIP); err != nil {
-		return fmt.Errorf("%s: %w", errConfigureDNS, err)
-	}
+	// Pull and push image
+	fmt.Println("\nPulling image...")
+	container := dag.Container().From("n8nio/n8n:0.234.0")
 
-	// Step 5: Wait for DNS propagation
-	time.Sleep(30 * time.Second)
+	fmt.Println("\nAdding labels...")
+	container = container.
+		WithLabel("org.opencontainers.image.created", time.Now().UTC().Format(time.RFC3339)).
+		WithLabel("org.opencontainers.image.source", "https://github.com/felipepimentel/daggerverse").
+		WithLabel("org.opencontainers.image.version", "0.234.0")
 
-	// Step 6: Setup server
-	fmt.Println(logSetupServer)
-	if err := n.setupServer(ctx, sshKey, dropletIP); err != nil {
-		return fmt.Errorf("%s: %w", errSetupServer, err)
-	}
-
-	// Step 7: Deploy services
-	fmt.Println(logDeployServices)
-	if err := n.deployServices(ctx, sshKey, dropletIP); err != nil {
-		return fmt.Errorf("%s: %w", errDeployServices, err)
-	}
-
-	// Step 8: Configure monitoring if enabled
-	if n.MonitoringEnabled {
-		fmt.Println(logSetupMonitoring)
-		if err := n.setupMonitoring(ctx, sshKey, dropletIP); err != nil {
-			return fmt.Errorf("%s: %w", errSetupMonitoring, err)
-		}
-	}
-
-	// Step 9: Configure backups if enabled
-	if n.BackupEnabled {
-		fmt.Println(logSetupBackups)
-		if err := n.setupBackups(ctx, sshKey, dropletIP); err != nil {
-			return fmt.Errorf("%s: %w", errSetupBackups, err)
-		}
-	}
-
-	fmt.Println(logSuccess)
-	return nil
-}
-
-// GetURL returns the URL of the n8n instance
-func (n *N8N) GetURL() string {
-	return fmt.Sprintf("https://%s.%s", n.Subdomain, n.Domain)
-}
-
-// GetStatus returns the status of the n8n deployment
-func (n *N8N) GetStatus(ctx context.Context, doToken *dagger.Secret) (string, error) {
-	container := dag.Container().
-		From("digitalocean/doctl:latest").
-		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", doToken).
-		WithExec([]string{
-			"compute", "droplet", "get",
-			fmt.Sprintf("%s-%s", n.Subdomain, n.Domain),
-			"--format", "json",
-		})
-
-	return container.Stdout(ctx)
-}
-
-// Destroy removes the n8n deployment
-func (n *N8N) Destroy(ctx context.Context, doToken *dagger.Secret) error {
-	container := dag.Container().
-		From("digitalocean/doctl:latest").
-		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", doToken).
-		WithExec([]string{
-			"compute", "droplet", "delete",
-			fmt.Sprintf("%s-%s", n.Subdomain, n.Domain),
-			"--force",
-		})
-
-	_, err := container.Sync(ctx)
-	return err
-}
-
-// setupRegistry configures the container registry
-func (n *N8N) setupRegistry(ctx context.Context, registry *dagger.Container) error {
-	// Create registry container with authentication
-	container := registry.
-		WithExposedPort(5000).
-		WithExec([]string{
-			"sh", "-c",
-			"mkdir -p /auth && htpasswd -Bbn admin admin > /auth/htpasswd",
-		})
-
-	// Run the registry in the background
-	_, err := container.WithExec([]string{"registry", "serve", "/etc/docker/registry/config.yml"}).Sync(ctx)
+	fmt.Println("\nPushing image...")
+	targetRef := fmt.Sprintf("registry.digitalocean.com/n8n-registry/n8nio/n8n:%s", "0.234.0")
+	container = container.WithRegistryAuth("registry.digitalocean.com", "", doToken)
+	_, err = container.Publish(ctx, targetRef)
 	if err != nil {
-		return fmt.Errorf("failed to start registry: %w", err)
+		return fmt.Errorf("failed to push image: %w", err)
 	}
+	fmt.Printf("\nSuccessfully pushed %s\n", targetRef)
 
-	return nil
-}
-
-// pushImages builds and pushes required images
-func (n *N8N) pushImages(ctx context.Context, registry *dagger.Container) error {
-	// Base images needed for n8n deployment
-	images := []struct {
-		name string
-		tag  string
-	}{
-		{name: "n8nio/n8n", tag: n.N8nVersion},
-		{name: "postgres", tag: n.PostgresVersion},
-		{name: "caddy", tag: "2.7.6-alpine"},
-	}
-
-	// Add cAdvisor if monitoring is enabled
-	if n.MonitoringEnabled {
-		images = append(images, struct{ name, tag string }{
-			name: "gcr.io/cadvisor/cadvisor",
-			tag:  "v0.47.2",
-		})
-	}
-
-	// Pull and push each image
-	for _, img := range images {
-		// Pull the image
-		container := dag.Container().From(fmt.Sprintf("%s:%s", img.name, img.tag))
-
-		// Add standard labels
-		container = container.
-			WithLabel("org.opencontainers.image.created", time.Now().Format(time.RFC3339)).
-			WithLabel("org.opencontainers.image.source", "https://github.com/felipepimentel/daggerverse").
-			WithLabel("org.opencontainers.image.version", img.tag)
-
-		// Add image-specific labels
-		switch img.name {
-		case "n8nio/n8n":
-			container = container.
-				WithLabel("org.opencontainers.image.title", "n8n Workflow Automation").
-				WithLabel("org.opencontainers.image.description", "n8n is an extendable workflow automation tool")
-		case "postgres":
-			container = container.
-				WithLabel("org.opencontainers.image.title", "PostgreSQL Database").
-				WithLabel("org.opencontainers.image.description", "PostgreSQL database for n8n")
-		case "caddy":
-			container = container.
-				WithLabel("org.opencontainers.image.title", "Caddy Web Server").
-				WithLabel("org.opencontainers.image.description", "Caddy web server for SSL/TLS and reverse proxy")
-		case "gcr.io/cadvisor/cadvisor":
-			container = container.
-				WithLabel("org.opencontainers.image.title", "cAdvisor").
-				WithLabel("org.opencontainers.image.description", "Container monitoring and performance analysis")
-		}
-
-		// Push the image to our registry using the registry name from config
-		targetRef := fmt.Sprintf("%s/%s:%s", n.RegistryName, img.name, img.tag)
-		_, err := container.Publish(ctx, targetRef)
-		if err != nil {
-			return fmt.Errorf("failed to push image %s: %w", targetRef, err)
-		}
-	}
-
-	return nil
-}
-
-// createDroplet creates a new DigitalOcean droplet
-func (n *N8N) createDroplet(ctx context.Context, doToken *dagger.Secret) (string, error) {
-	container := dag.Container().
-		From("digitalocean/doctl:latest").
-		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", doToken).
-		WithExec([]string{
-			"compute", "droplet", "create",
-			fmt.Sprintf("%s-%s", n.Subdomain, n.Domain),
-			"--region", n.Region,
-			"--size", n.Size,
-			"--image", "docker-20-04",
-			"--ssh-keys", n.SSHKeyName,
-			"--format", "json",
-		})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	return output, nil
-}
-
-// configureDNS sets up DNS records
-func (n *N8N) configureDNS(ctx context.Context, doToken *dagger.Secret, dropletIP string) error {
-	container := dag.Container().
-		From("digitalocean/doctl:latest").
-		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", doToken).
-		WithExec([]string{
-			"compute", "domain", "records", "create",
-			n.Domain,
-			"--record-type", "A",
-			"--record-name", n.Subdomain,
-			"--record-data", dropletIP,
-		})
-
-	_, err := container.Sync(ctx)
-	return err
-}
-
-// setupServer prepares the server for deployment
-func (n *N8N) setupServer(ctx context.Context, sshKey *dagger.Secret, dropletIP string) error {
-	container := dag.Container().
+	// Set up SSH key container
+	fmt.Println("\nGenerating SSH key...")
+	sshContainer := dag.Container().
 		From("alpine:latest").
-		WithSecretVariable("SSH_KEY", sshKey).
-		WithExec([]string{"sh", "-c", "mkdir -p /root/.ssh && echo \"$SSH_KEY\" > /root/.ssh/id_rsa"}).
-		WithExec([]string{"chmod", "600", "/root/.ssh/id_rsa"}).
-		WithExec([]string{"ssh", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("root@%s", dropletIP), "mkdir", "-p", "/opt/n8n"})
+		WithExec([]string{"apk", "add", "openssh"}).
+		WithExec([]string{"mkdir", "-p", "/root/.ssh"}).
+		WithExec([]string{
+			"ssh-keygen",
+			"-t", "ed25519",
+			"-f", "/root/.ssh/id_ed25519",
+			"-N", "",
+			"-C", "n8n-deployment",
+		})
 
-	_, err := container.Sync(ctx)
-	return err
-}
+	// Get public key contents
+	pubKey, err := sshContainer.File("/root/.ssh/id_ed25519.pub").Contents(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read public key: %w", err)
+	}
 
-// deployServices deploys n8n and related services
-func (n *N8N) deployServices(ctx context.Context, sshKey *dagger.Secret, dropletIP string) error {
-	// Implementation here
-	return nil
-}
+	// Get private key contents
+	privateKey, err := sshContainer.File("/root/.ssh/id_ed25519").Contents(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read private key: %w", err)
+	}
 
-// setupMonitoring configures monitoring services
-func (n *N8N) setupMonitoring(ctx context.Context, sshKey *dagger.Secret, dropletIP string) error {
-	// Implementation here
-	return nil
-}
+	// Save private key to file for debugging
+	keyFile := "/tmp/n8n_id_ed25519"
+	fmt.Printf("\nSaving private key to %s\n", keyFile)
+	err = os.WriteFile(keyFile, []byte(privateKey), 0600)
+	if err != nil {
+		return fmt.Errorf("failed to save private key: %w", err)
+	}
 
-// setupBackups configures backup services
-func (n *N8N) setupBackups(ctx context.Context, sshKey *dagger.Secret, dropletIP string) error {
-	// Implementation here
+	fmt.Println("\nPrivate key for debugging:")
+	fmt.Println(privateKey)
+
+	// Set up DigitalOcean container
+	fmt.Println("\nSetting up DigitalOcean client...")
+	doContainer := dag.Container().
+		From("digitalocean/doctl:1.101.0").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", doToken)
+
+	// Delete existing SSH key if it exists
+	fmt.Println("\nCleaning up existing SSH keys...")
+	_, _ = doContainer.WithExec([]string{
+		"/app/doctl", "compute", "ssh-key", "delete", "n8n-key",
+		"--force",
+	}).Stdout(ctx)
+
+	// Add SSH key to DigitalOcean
+	fmt.Println("\nAdding SSH key to DigitalOcean...")
+	sshKeyOutput, err := doContainer.WithExec([]string{
+		"/app/doctl", "compute", "ssh-key", "create",
+		"n8n-key",
+		"--public-key", pubKey,
+		"--format", "ID",
+		"--no-header",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to add SSH key: %w", err)
+	}
+	sshKeyID := strings.TrimSpace(sshKeyOutput)
+
+	// Create droplet with SSH key
+	fmt.Println("\nCreating droplet...")
+	dropletOutput, err := doContainer.WithExec([]string{
+		"/app/doctl", "compute", "droplet", "create",
+		fmt.Sprintf("n8n-%s", n.Subdomain),
+		"--region", "syd1",
+		"--size", "s-1vcpu-1gb",
+		"--image", "ubuntu-22-04-x64",
+		"--ssh-keys", sshKeyID,
+		"--format", "ID,PublicIPv4",
+		"--no-header",
+		"--wait",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create droplet: %w", err)
+	}
+
+	// Parse droplet output
+	parts := strings.Fields(dropletOutput)
+	if len(parts) != 2 {
+		return fmt.Errorf("unexpected droplet output format: %s", dropletOutput)
+	}
+	dropletID := parts[0]
+	dropletIP := parts[1]
+
+	fmt.Printf("\nDroplet created successfully:\n")
+	fmt.Printf("  ID: %s\n", dropletID)
+	fmt.Printf("  IP: %s\n", dropletIP)
+
+	// Configure DNS
+	fmt.Println("\nConfiguring DNS...")
+	_, err = doContainer.WithExec([]string{
+		"/app/doctl", "compute", "domain", "records", "create",
+		n.Domain,
+		"--record-type", "A",
+		"--record-name", n.Subdomain,
+		"--record-data", dropletIP,
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to configure DNS: %w", err)
+	}
+
+	// Wait for droplet to be ready
+	fmt.Println("\nWaiting for droplet to complete initialization (2 minutes)...")
+	time.Sleep(2 * time.Minute)
+
+	// Prepare setup script
+	fmt.Println("\nPreparing setup script...")
+	setupScript := fmt.Sprintf(`#!/bin/bash
+	set -e
+
+	# Update package list and install dependencies
+	apt-get update
+	apt-get install -y docker.io docker-compose
+
+	# Start Docker service
+	systemctl start docker
+	systemctl enable docker
+
+	# Log in to registry
+	echo "%s" | docker login registry.digitalocean.com --username _ --password-stdin
+
+	# Pull image
+	docker pull %s
+
+	# Create docker-compose.yml
+	cat > /root/docker-compose.yml <<EOL
+	version: '3.8'
+	services:
+	  n8n:
+		image: %s
+		restart: always
+		ports:
+		  - "80:5678"
+		environment:
+		  - N8N_HOST=%s.%s
+		  - N8N_PROTOCOL=https
+		  - NODE_ENV=production
+		volumes:
+		  - n8n_data:/home/node/.n8n
+	volumes:
+	  n8n_data:
+	EOL
+
+	# Start services
+	cd /root && docker-compose up -d
+	`, tokenValue, targetRef, targetRef, n.Subdomain, n.Domain)
+
+	// Set up deployment container
+	fmt.Println("\nPreparing deployment container...")
+	deployContainer := dag.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "openssh-client"}).
+		WithNewFile("/root/.ssh/id_ed25519", privateKey).
+		WithNewFile("/setup.sh", setupScript).
+		WithExec([]string{"chmod", "600", "/root/.ssh/id_ed25519"}).
+		WithExec([]string{"chmod", "755", "/setup.sh"})
+
+	// Wait for SSH to be ready (try multiple times)
+	fmt.Println("\nChecking SSH connectivity...")
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		fmt.Printf("\nAttempt %d/%d to establish SSH connection...\n", i+1, maxRetries)
+		
+		// Check droplet status
+		status, err := doContainer.WithExec([]string{
+			"/app/doctl", "compute", "droplet", "get",
+			dropletID,
+			"--format", "Status",
+			"--no-header",
+		}).Stdout(ctx)
+		if err != nil {
+			fmt.Printf("Failed to get droplet status: %v\n", err)
+		} else {
+			fmt.Printf("Droplet status: %s\n", strings.TrimSpace(status))
+		}
+		
+		// Try to connect
+		_, err = deployContainer.WithExec([]string{
+			"ssh",
+			"-o", "StrictHostKeyChecking=no",
+			"-o", "ConnectTimeout=10",
+			fmt.Sprintf("root@%s", dropletIP),
+			"echo 'SSH connection successful'",
+		}).Stdout(ctx)
+		
+		if err == nil {
+			fmt.Println("SSH connection established successfully!")
+			break
+		}
+		
+		if i == maxRetries-1 {
+			return fmt.Errorf("failed to establish SSH connection after %d attempts", maxRetries)
+		}
+		
+		fmt.Printf("SSH connection failed: %v\n", err)
+		fmt.Printf("Waiting 30 seconds before next attempt...\n")
+		time.Sleep(30 * time.Second)
+	}
+
+	// Copy setup script
+	fmt.Println("\nCopying setup script...")
+	_, err = deployContainer.WithExec([]string{
+		"scp",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "ConnectTimeout=10",
+		"/setup.sh",
+		fmt.Sprintf("root@%s:/root/setup.sh", dropletIP),
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to copy setup script: %w", err)
+	}
+
+	// Execute setup script
+	fmt.Println("\nExecuting setup script...")
+	_, err = deployContainer.WithExec([]string{
+		"ssh",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "ConnectTimeout=10",
+		fmt.Sprintf("root@%s", dropletIP),
+		"bash /root/setup.sh",
+	}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute setup script: %w", err)
+	}
+
+	fmt.Printf("\nDeployment complete! n8n will be available at https://%s.%s\n", n.Subdomain, n.Domain)
+	fmt.Printf("Note: It may take a few minutes for DNS to propagate and for n8n to fully start up.\n")
 	return nil
 }
