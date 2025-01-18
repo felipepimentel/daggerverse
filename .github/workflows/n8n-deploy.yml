@@ -1,0 +1,26 @@
+name: Deploy n8n
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'n8n/**'
+      - '.github/workflows/n8n-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-n8n-ci-cd.yml
+    with:
+      deploy: true
+      region: 'syd1'
+      app_name: 'n8n'
+      source_path: './n8n'
+    secrets:
+      DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DO_SSH_KEY_FINGERPRINT: ${{ secrets.DO_SSH_KEY_FINGERPRINT }}
+      DO_SSH_KEY_ID: ${{ secrets.DO_SSH_KEY_ID }}
+      DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+      N8N_BASIC_AUTH_PASSWORD: ${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+      N8N_DOMAIN: ${{ secrets.N8N_DOMAIN }}
+      N8N_ENCRYPTION_KEY: ${{ secrets.N8N_ENCRYPTION_KEY }} 
