@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/felipepimentel/daggerverse/pipelines/n8n/pkg/n8n"
+	n8n "github.com/felipepimentel/daggerverse/pipelines/n8n"
 )
 
 func main() {
@@ -51,4 +51,4 @@ func main() {
 	}
 
 	fmt.Printf("Successfully deployed n8n to %s\n", n8nModule.GetURL())
-}
+} 

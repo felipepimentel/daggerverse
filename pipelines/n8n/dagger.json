@@ -8,10 +8,6 @@
       "source": "../../libraries/digitalocean"
     },
     {
-      "name": "docker",
-      "source": "../../libraries/docker"
-    },
-    {
       "name": "ssh",
       "source": "../../essentials/ssh"
     }
