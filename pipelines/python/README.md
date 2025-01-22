@@ -45,7 +45,7 @@ if err != nil {
 
 ## Requirements
 
-- Dagger v0.15.2
+- Dagger v0.15.3
 - Go 1.23.4
 - Python project with Poetry configuration
 - PyPI token for publishing

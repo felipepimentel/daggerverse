@@ -148,7 +148,7 @@ Example `dagger.json`:
 ```json
 {
   "name": "wolfi",
-  "engineVersion": "v0.15.2",
+  "engineVersion": "v0.15.3",
   "sdk": "go",
   "dependencies": [
     {
@@ -214,7 +214,7 @@ In this example:
 2. **Dagger Workflow-Specific Rules**
    - Always use `dagger/<module>/internal/dagger` for imports.
    - Validate Dagger and Go versions:
-     - Dagger version: `0.15.2`.
+     - Dagger version: `0.15.3`.
      - Go version: `1.23.2`.
 
 3. **Testing**

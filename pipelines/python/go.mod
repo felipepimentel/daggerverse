@@ -44,7 +44,7 @@ require (
 	google.golang.org/protobuf v1.36.1 // indirect
 )
 
-replace dagger.io/dagger => github.com/dagger/dagger/sdk/go v0.15.2
+replace dagger.io/dagger => github.com/dagger/dagger/sdk/go v0.15.3
 
 replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88
 

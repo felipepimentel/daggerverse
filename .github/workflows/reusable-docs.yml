@@ -110,7 +110,7 @@ jobs:
         if: inputs.generator == 'mkdocs'
         uses: dagger/dagger-for-github@v5
         with:
-          version: "0.15.2"
+          version: "0.15.3"
       
       # Sphinx Setup
       - name: Install Poetry

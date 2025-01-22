@@ -4,7 +4,7 @@ This directory contains scripts to test the n8n-digitalocean module locally. The
 
 ## Prerequisites
 
-1. Install Dagger CLI (version 0.15.2)
+1. Install Dagger CLI (version 0.15.3)
 2. Have Docker running locally
 3. Have all required secrets/environment variables:
    - `DIGITALOCEAN_ACCESS_TOKEN`: Your DigitalOcean API token

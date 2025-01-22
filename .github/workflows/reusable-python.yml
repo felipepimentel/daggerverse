@@ -10,7 +10,7 @@ on:
         type: string
       dagger_version:
         description: "Dagger version to use"
-        default: "0.15.2"
+        default: "0.15.3"
         required: false
         type: string
       skip_tests:

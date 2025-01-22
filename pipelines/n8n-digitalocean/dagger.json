@@ -1,5 +1,0 @@
-{
-  "name": "n8n-digitalocean",
-  "engineVersion": "v0.15.2",
-  "sdk": "go"
-}
