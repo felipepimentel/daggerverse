@@ -94,3 +94,5 @@ node_modules
 /dagger.gen.go
 
 .env
+
+.ssh

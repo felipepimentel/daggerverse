@@ -2,19 +2,5 @@
   "name": "n8n",
   "engineVersion": "v0.15.3",
   "sdk": "go",
-  "dependencies": [
-    {
-      "name": "digitalocean",
-      "source": "../../libraries/digitalocean"
-    },
-    {
-      "name": "docker",
-      "source": "../../libraries/docker"
-    },
-    {
-      "name": "ssh",
-      "source": "../../essentials/ssh"
-    }
-  ],
   "source": "."
 }
