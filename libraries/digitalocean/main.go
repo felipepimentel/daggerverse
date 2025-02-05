@@ -365,3 +365,22 @@ func (do *DigitalOcean) DeleteSSHKey(ctx context.Context, keyID string) error {
 		Stdout(ctx)
 	return err
 }
+
+// RegisterSSHKey registers an SSH key with DigitalOcean
+func (do *DigitalOcean) RegisterSSHKey(ctx context.Context, name string, publicKey string) error {
+	fmt.Printf("📝 Registering SSH key: %s\n", name)
+	_, err := dag.Container().
+		From("digitalocean/doctl:1.101.0").
+		WithSecretVariable("DIGITALOCEAN_ACCESS_TOKEN", do.token).
+		WithExec([]string{
+			"compute",
+			"ssh-key",
+			"create",
+			name,
+			"--public-key", publicKey,
+			"--format", "ID",
+			"--no-header",
+		}).
+		Stdout(ctx)
+	return err
+}
